@@ -1,0 +1,14 @@
+[package]
+name = "mediaserver-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4.9.0"
+actix-web-httpauth = "0.8.2"
+anyhow = "1.0.89"
+log = "0.4.22"
+webrtc = "0.11.0"
+env_logger = "0.11.5"
+futures = "0.3.31"
+tokio = "1.40.0"
