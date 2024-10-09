@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder};
 use actix_web::http::header::TryIntoHeaderPair;
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use crate::endpoints::Container;

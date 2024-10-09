@@ -3,16 +3,16 @@ use actix_web::{web, App, HttpServer};
 use actix_web::middleware::Logger;
 use crate::{endpoints, ingress};
 use crate::hubs::hub::Hub;
+use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 
 pub mod whip;
 pub mod whep;
 
-pub async fn build(hub : Arc<Hub>) -> std::io::Result<()> {
-
+pub async fn build(hub : Arc<Hub>, api: Arc<WebRtcApi>) -> std::io::Result<()> {
     HttpServer::new(move|| {
         App::new()
             .app_data(web::Data::new(Container{
-                whip_server: ingress::servers::whip::WhipServer::new(Arc::clone(&hub)),
+                whip_server: ingress::servers::whip::WhipServer::new(hub.clone(), api.clone()),
             }))
             .wrap(Logger::default())
             .configure(routes)
