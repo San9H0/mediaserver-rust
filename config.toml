@@ -1,3 +1,6 @@
 
 [log]
 level = "info"
+
+[general]
+workers = 0 # 0 means number of CPUs

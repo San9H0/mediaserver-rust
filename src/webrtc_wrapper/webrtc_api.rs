@@ -1,15 +1,16 @@
-use webrtc::api::API;
+use std::sync::Arc;
 use webrtc::api::media_engine::MediaEngine;
 use webrtc::api::setting_engine::SettingEngine;
+use webrtc::api::API;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::RTCPeerConnection;
 
 pub struct WebRtcApi {
-    api: API
+    api: API,
 }
 
 impl WebRtcApi {
-    pub fn new() -> Self {
+    pub fn new() -> Arc<Self> {
         let mut setting_engine = SettingEngine::default();
         setting_engine.set_lite(true);
 
@@ -20,11 +21,14 @@ impl WebRtcApi {
             .with_media_engine(media_engine)
             .with_setting_engine(setting_engine)
             .build();
-        Self { api }
+        Arc::new(Self { api })
     }
 
     pub async fn new_peer_connection(&self) -> RTCPeerConnection {
-        let config = RTCConfiguration { ..Default::default() };
+        let config = RTCConfiguration {
+            ..Default::default()
+        };
+
         self.api.new_peer_connection(config).await.unwrap()
     }
 }

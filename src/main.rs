@@ -1,22 +1,47 @@
+mod codecs;
+mod egress;
 mod endpoints;
-mod ingress;
 mod hubs;
+mod ingress;
 mod webrtc_wrapper;
 
-use std::sync::Arc;
-use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
-use config::{Config, ConfigBuilder, File, FileFormat};
 use crate::hubs::hub::Hub;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
-
+use config::{Config, File, FileFormat};
+use std::sync::Arc;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()>{
-    let builder = Config::builder()
-        .add_source(File::new("config.toml", FileFormat::Toml))
-        .build().unwrap();
+async fn main() -> std::io::Result<()> {
+    let config = Arc::new(
+        Config::builder()
+            .add_source(File::new("config.toml", FileFormat::Toml))
+            .build()
+            .unwrap(),
+    );
 
-    let level: String = builder.get("log.level").unwrap();
+    init_log(config.clone());
+
+    let num_workers = config
+        .get("general.workers")
+        .map(|w| if w == 0 { num_cpus::get() } else { w })
+        .unwrap_or_else(|_| num_cpus::get());
+
+    log::info!("Starting server");
+    println!("Hello, world!");
+
+    let _tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(num_workers) // 스레드 수를 8개로 설정
+        .enable_all()
+        .build()
+        .expect("Failed to create Tokio runtime");
+
+    let hub = Hub::new();
+    let api = WebRtcApi::new();
+    endpoints::build(hub.clone(), api.clone()).await
+}
+
+fn init_log(config: Arc<Config>) {
+    let level: String = config.get("log.level").unwrap();
     let log_level = match level.as_str() {
         "debug" => log::LevelFilter::Debug,
         "info" => log::LevelFilter::Info,
@@ -24,15 +49,5 @@ async fn main() -> std::io::Result<()>{
         "error" => log::LevelFilter::Error,
         _ => log::LevelFilter::Info,
     };
-    env_logger::builder()
-        .filter_level(log_level)
-        .init();
-
-    log::info!("Starting server");
-    println!("Hello, world!");
-
-    let hub = Arc::new(Hub::new());
-    let api = Arc::new(WebRtcApi::new());
-
-    endpoints::build(hub, api).await
+    env_logger::builder().filter_level(log_level).init();
 }
