@@ -1,0 +1,10 @@
+[package]
+name = "bitstreams"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+bytes = "1.7.2"
+num-traits = "0.2.19"
+thiserror = "1.0.64"

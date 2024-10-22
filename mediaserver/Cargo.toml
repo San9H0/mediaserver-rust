@@ -1,0 +1,32 @@
+[package]
+name = "mediaserver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitstreams = { path = "../bitstreams", package = "bitstreams" }
+
+actix-web = "4.9.0"
+actix-web-httpauth = "0.8.2"
+anyhow = "1.0.89"
+log = "0.4.22"
+webrtc = "0.11.0"
+env_logger = "0.11.5"
+futures = "0.3.31"
+tokio = "1.40.0"
+config = "0.14.0"
+num_cpus = "1.16.0"
+sysinfo = "0.32.0"
+rand = "0.8.5"
+uuid = "1.10.0"
+byteorder = "1.5.0"
+bytes = "1.7.2"
+hex = "0.4.3"
+bytesio = "0.3.4"
+h264-decoder = "0.2.4"
+ffmpeg-next = "7.1.0"
+tokio-util = "0.7.12"
+async-trait = "0.1.83"
+chrono = "0.4.38"
+ffmpeg-sys-next = "7.1.0"
+scopeguard = "1.2.0"
