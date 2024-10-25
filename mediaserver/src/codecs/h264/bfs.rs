@@ -1,8 +1,7 @@
-use bytes::BytesMut;
 use ffmpeg_next as ffmpeg;
 use crate::hubs::unit::HubUnit;
 
-pub fn make_packet(unit: &HubUnit) -> ffmpeg::packet::Packet{
+pub fn make_packet_with_avcc(unit: &HubUnit) -> ffmpeg::packet::Packet{
     let data_len = unit.payload.len() as u32;
     let length_prefix = data_len.to_be_bytes();
 

@@ -30,3 +30,4 @@ async-trait = "0.1.83"
 chrono = "0.4.38"
 ffmpeg-sys-next = "7.1.0"
 scopeguard = "1.2.0"
+serde = { version = "1.0.210", features = ["derive"] }

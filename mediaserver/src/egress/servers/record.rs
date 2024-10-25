@@ -1,15 +1,16 @@
-use crate::egress::sessions::record::record::RecordSession;
 use crate::hubs::hub::Hub;
+use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time;
-use crate::egress::sessions::session::Session;
+use crate::egress::sessions::record::handler::RecordHandler;
+use crate::egress::sessions::session::{Session, SessionHandler};
 
 pub struct RecordServer {
     hub: Arc<Hub>,
 
-    record_sessions: RwLock<HashMap<String, Arc<RecordSession>>>,
+    record_sessions: RwLock<HashMap<String, Arc<Session<RecordHandler>>>>,
 }
 
 impl RecordServer {
@@ -21,36 +22,41 @@ impl RecordServer {
         })
     }
 
-    pub async fn start_session(&self, stream_id: String) -> anyhow::Result<()> {
+    pub async fn start_session(&self, stream_id: &str) -> anyhow::Result<String> {
         let hub_stream = self
             .hub
             .get_stream(&stream_id)
             .ok_or(anyhow::anyhow!("stream not found"))?;
-        let record_session = RecordSession::new(hub_stream).await?;
 
-        let a = record_session.init().await?;
+        let session_id = Uuid::new_v4().to_string();
+        log::info!("record session started: {}", &session_id);
 
-        let sess = record_session.clone();
+        let handler = RecordHandler::new(&hub_stream, &session_id).await?;
+        let sess = Session::new(handler);
+
+        self.record_sessions
+            .write()
+            .await
+            .insert(session_id.to_string(), sess.clone());
+
         tokio::spawn(async move {
             if let Err(err) = sess.run().await {
                 log::warn!("write file failed: {:?}", err);
-                return;
             }
         });
 
-        let mut sess = record_session.clone();
-        tokio::spawn(async move {
-            time::sleep(time::Duration::from_secs(10)).await;
-            sess.stop();
-        });
-        // sess.clone().run().await?;
 
-        // let mut sess2 = sess.clone();
-        // tokio::spawn(async move {
-        //     sleep(std::time::Duration::from_secs(10)).await;
-        //     // sess2.close();
-        // });
+        Ok(session_id)
+    }
 
+    pub async fn stop_session(&self, session_id: String) -> anyhow::Result<()> {
+        let sessions = self.record_sessions
+            .read()
+            .await;
+        let sess = sessions
+            .get(&session_id)
+            .ok_or(anyhow::anyhow!("session not found"))?;
+        sess.stop();
         Ok(())
     }
 }

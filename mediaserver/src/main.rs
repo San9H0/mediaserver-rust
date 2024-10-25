@@ -5,6 +5,8 @@ mod hubs;
 mod ingress;
 mod webrtc_wrapper;
 
+mod utils;
+
 use crate::hubs::hub::Hub;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use config::{Config, File, FileFormat};

@@ -38,7 +38,9 @@ pub async fn build(hub: Arc<Hub>) -> std::io::Result<()> {
 fn routes(app: &mut web::ServiceConfig) {
     app.service(web::resource("/v1/whip").route(web::post().to(whip::handle_whip)))
         .service(web::resource("/v1/whep").route(web::post().to(whep::handle_whep)))
-        .service(web::resource("/v1/record").route(web::post().to(file::handle_record)));
+        .service(web::resource("/v1/record").route(web::post().to(file::handle_create_record)))
+        .service(web::resource("/v1/record/{session_id}").route(web::delete().to(file::handle_delete_record)));
+    ;
 }
 
 pub struct Container {

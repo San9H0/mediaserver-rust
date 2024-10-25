@@ -35,7 +35,7 @@ use webrtc::rtp_transceiver::rtp_codec::{
 };
 use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
 use webrtc::track::track_remote::TrackRemote;
-use crate::egress::sessions::record::record::RecordSession;
+use crate::egress::sessions::record::handler::RecordHandler;
 use ffmpeg_next as ffmpeg;
 use ffmpeg_next::Rescale;
 use crate::codecs::codec::Codec::Opus;
