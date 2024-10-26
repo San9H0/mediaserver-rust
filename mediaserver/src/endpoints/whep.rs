@@ -28,7 +28,7 @@ pub async fn handle_whep(
 
     let answer = match handler
         .whep_server
-        .start_session(token.to_owned(), offer.to_string())
+        .start_session(token.to_owned(), &offer)
         .await
     {
         Ok(answer) => answer,

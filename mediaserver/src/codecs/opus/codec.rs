@@ -1,6 +1,7 @@
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
+use crate::utils::types::types;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct OpusCodec;
 
 impl OpusCodec {
@@ -8,8 +9,8 @@ impl OpusCodec {
         Self
     }
 
-    pub fn kind(&self) -> &'static str {
-        "audio"
+    pub fn kind(&self) -> types::MediaKind {
+        types::MediaKind::Audio
     }
 
     pub fn mime_type(&self) -> &'static str {

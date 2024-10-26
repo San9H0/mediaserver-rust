@@ -7,19 +7,13 @@ use tokio_util::sync::CancellationToken;
 
 pub struct HubSink {
     rx: RwLock<Receiver<HubUnit>>,
-    token: CancellationToken,
 }
 
 impl HubSink {
     pub fn new(rx: Receiver<HubUnit>) -> Arc<Self> {
-        let token = CancellationToken::new();
         Arc::new(HubSink {
             rx: RwLock::new(rx),
-            token,
         })
-    }
-    pub fn stop(self: &Arc<Self>) {
-        self.token.cancel()
     }
 
     pub async fn read_unit(self: &Arc<Self>) -> Result<HubUnit, RecvError> {

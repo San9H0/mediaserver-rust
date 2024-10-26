@@ -27,7 +27,7 @@ impl TrackContext {
             dts: 0,
         }
     }
-    pub fn make_packet(&mut self, unit: &HubUnit) -> ffmpeg::packet::Packet{
+    pub fn make_packet(&mut self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
         if !self.started {
             self.started = true;
             self.base_ts = unit.pts;
@@ -40,9 +40,13 @@ impl TrackContext {
             self.dts = unit.dts - self.base_ts;
         }
 
+        let Some(mut pkt) = self.bfs.make_packet(&unit) else {
+            return None;
+        };
+
         let input_time_base = ffmpeg::Rational::new(1, unit.timebase as i32);
         let output_time_base = ffmpeg::Rational::new(1, self.codec.clock_rate() as i32);
-        let mut pkt = self.bfs.make_packet(&unit);
+
 
         pkt.set_stream(self.idx);
         pkt.set_pts(Some((self.pts as i64).rescale(input_time_base, output_time_base)));
@@ -55,6 +59,6 @@ impl TrackContext {
         if unit.frame_info.flag == 1 {
             pkt.set_flags(ffmpeg::packet::Flags::KEY);
         }
-        pkt
+        Some(pkt)
     }
 }

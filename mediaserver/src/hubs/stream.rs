@@ -3,15 +3,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub struct HubStream {
-    id: String,
-
     sources: RwLock<Vec<Arc<HubSource>>>,
 }
 
 impl HubStream {
-    pub fn new(id: String) -> Arc<Self> {
+    pub fn new() -> Arc<Self> {
         Arc::new(HubStream {
-            id,
             sources: RwLock::new(Vec::new()),
         })
     }

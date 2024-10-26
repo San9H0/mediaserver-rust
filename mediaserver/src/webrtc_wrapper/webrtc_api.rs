@@ -10,6 +10,7 @@ pub struct WebRtcApi {
 }
 
 impl WebRtcApi {
+    #[allow(dead_code)]
     pub fn new() -> Arc<Self> {
         let mut setting_engine = SettingEngine::default();
         setting_engine.set_lite(true);

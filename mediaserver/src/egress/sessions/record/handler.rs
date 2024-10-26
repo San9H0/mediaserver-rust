@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,15 +11,16 @@ use ffmpeg_sys_next::sprintf;
 use tokio::sync::Mutex;
 use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
+use crate::codecs::h264::format::NALUType;
 use crate::egress::sessions::record::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::unit::HubUnit;
 use crate::utils::files::directory::create_directory_if_not_exists;
+use crate::utils::types::types;
 
 pub struct RecordHandler {
     started: AtomicBool,
-    hub_stream: Arc<HubStream>,
     token: CancellationToken,
 
     output_ctx: Arc<Mutex<context::Output>>,
@@ -30,27 +32,27 @@ impl RecordHandler {
         let token = CancellationToken::new();
         let name_filename = format!("{}/output.mp4", session_id);
         create_directory_if_not_exists(&name_filename)?;
-        println!("name_filename:{}", &name_filename);
+
         let mut output_ctx = ffmpeg::format::output(&name_filename)?;
         let mut sources =  vec![];
         for source in hub_stream.get_sources().await {
             let codec_info = source.get_codec().await.unwrap();
-            if codec_info.kind() == "audio" {
+            if codec_info.kind() == types::MediaKind::Audio {
                 let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
                     .ok_or(ffmpeg::Error::EncoderNotFound)?;
                 let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
                 let mut audio = encoder_ctx.encoder().audio()?;
-                let a = codec_info.set_av_audio(&mut audio);
+                let _ = codec_info.set_av_audio(&mut audio);
                 let encoder = audio.open_as(codec)?;
                 output_ctx.add_stream_with(&encoder)?;
 
-            } else if codec_info.kind() == "video" {
+            } else if codec_info.kind() == types::MediaKind::Video {
                 let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
                     .ok_or(ffmpeg::Error::EncoderNotFound)?;
                 let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
 
                 let mut video = encoder_ctx.encoder().video()?;
-                codec_info.set_av_video(&mut video)?;
+                let _ = codec_info.set_av_video(&mut video)?;
                 let encoder = video.open_as(codec)?;
                 output_ctx.add_stream_with(&encoder)?;
             }
@@ -59,7 +61,6 @@ impl RecordHandler {
 
         Ok(RecordHandler {
             started: AtomicBool::new(false),
-            hub_stream: hub_stream.clone(),
             token,
             output_ctx: Arc::new(Mutex::new(output_ctx)),
             sources,
@@ -96,7 +97,7 @@ impl SessionHandler for RecordHandler {
         self.sources.clone()
     }
 
-    fn on_track(&self, idx: usize, codec: &Codec) -> track_context::TrackContext {
+    fn on_track_context(&self, idx: usize, codec: &Codec) -> track_context::TrackContext {
         track_context::TrackContext::new(idx, codec)
     }
 
@@ -108,7 +109,9 @@ impl SessionHandler for RecordHandler {
             self.started.store(true, Ordering::Release);
         }
 
-        let pkt = ctx.make_packet(unit);
+        let Some(pkt) = ctx.make_packet(unit) else {
+            return;
+        };
 
         let mut output_ctx = self.output_ctx.lock().await;
         if let Err(err) = pkt.write_interleaved(&mut output_ctx) {
@@ -121,7 +124,9 @@ impl SessionHandler for RecordHandler {
             return;
         }
 
-        let pkt = ctx.make_packet(unit);
+        let Some(pkt) = ctx.make_packet(unit) else {
+            return;
+        };
 
         let mut output_ctx = self.output_ctx.lock().await;
         if let Err(err) = pkt.write_interleaved(&mut output_ctx) {

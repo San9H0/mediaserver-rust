@@ -18,7 +18,7 @@ impl WhipServer {
         stream_id: String,
         offer: String,
     ) -> anyhow::Result<String> {
-        let hub_stream = HubStream::new(stream_id.clone());
+        let hub_stream = HubStream::new();
         self.hub.insert_stream(&stream_id, hub_stream.clone());
 
         println!(

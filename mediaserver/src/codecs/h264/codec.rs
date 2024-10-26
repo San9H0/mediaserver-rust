@@ -1,7 +1,9 @@
+use std::hash::Hash;
 use std::ptr;
 use crate::codecs::h264::config::Config;
 use ffmpeg_next as ffmpeg;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
+use crate::utils::types::types;
 
 #[derive(Debug, Clone)]
 pub struct H264Codec {
@@ -13,10 +15,9 @@ impl H264Codec {
         H264Codec { config }
     }
 
-    pub fn kind(&self) -> &'static str {
-        "video"
+    pub fn kind(&self) -> types::MediaKind {
+        types::MediaKind::Video
     }
-
     pub fn mime_type(&self) -> &'static str {
         "video/h264"
     }
@@ -64,5 +65,32 @@ impl H264Codec {
         }
 
         Ok(())
+    }
+}
+
+impl PartialEq for H264Codec {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind() == other.kind() &&
+        self.mime_type() == other.mime_type() &&
+        self.clock_rate() == other.clock_rate() &&
+        self.channels() == other.channels() &&
+        self.samples() == other.samples() &&
+            self.config.width() == other.config.width() &&
+            self.config.height() == other.config.height()
+    }
+}
+
+impl Eq for H264Codec {
+}
+
+impl Hash for H264Codec {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind().hash(state);
+        self.mime_type().hash(state);
+        self.clock_rate().hash(state);
+        self.channels().hash(state);
+        self.samples().hash(state);
+        self.config.width().hash(state);
+        self.config.height().hash(state);
     }
 }

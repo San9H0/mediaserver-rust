@@ -4,15 +4,20 @@ use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
 use crate::hubs::source::HubSource;
 use crate::hubs::unit::HubUnit;
+use crate::utils::types::types;
 
 pub trait SessionHandler {
     type TrackContext: Send + Sync + 'static;
-    fn on_initialize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
-    fn on_finalize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    fn on_initialize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
+        async { Ok(()) }
+    }
+    fn on_finalize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
+        async { Ok(()) }
+    }
     fn stop(&self);
     fn cancel_token(&self) -> CancellationToken;
     fn get_sources(&self) -> Vec<Arc<HubSource>>;
-    fn on_track(&self, idx: usize, codec: &Codec) -> Self::TrackContext;
+    fn on_track_context(&self, idx: usize, codec: &Codec) -> Self::TrackContext;
     fn on_video(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) -> impl std::future::Future<Output = ()> + Send;
     
     fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) -> impl std::future::Future<Output = ()> + Send;
@@ -37,6 +42,11 @@ where
             handler: Arc::new(handler),
         })
     }
+    pub fn from_arc(handler: Arc<T>) -> Arc<Self> {
+        Arc::new(Session {
+            handler,
+        })
+    }
 
     pub fn stop(self: &Arc<Self>) {
         self.handler.stop();
@@ -47,12 +57,12 @@ where
         let mut join_handles = vec![];
         for (idx, source) in self.handler.get_sources().iter().enumerate() {
             let codec = source.get_codec().await.unwrap();
-            let track = source.get_track().await;
+            let track = source.get_track(&codec).await?;
             let sink = track.add_sink().await;
             let cancel_token = self.handler.cancel_token();
             let self_ = self.clone();
 
-            let mut ctx = self_.handler.on_track(idx, &codec);
+            let mut ctx = self_.handler.on_track_context(idx, &codec);
             let handler_ = self_.handler.clone();
 
             let handle = tokio::spawn(async move {
@@ -66,14 +76,16 @@ where
                                 log::warn!("read unit failed");
                                 break;
                             };
-                            if codec.kind() == "audio" {
+                            if codec.kind() == types::MediaKind::Audio {
                                 self_.handler.on_audio(&mut ctx, &unit).await;
-                            } else if codec.kind() == "video" {
+                            } else if codec.kind() == types::MediaKind::Video {
                                 self_.handler.on_video(&mut ctx, &unit).await;
                             }
                         }
                     }
                 }
+
+                track.remove_sink(&sink).await;
             });
             join_handles.push(handle);
         }
@@ -85,5 +97,14 @@ where
         self.handler.on_finalize().await?;
 
         Ok(())
+    }
+}
+
+impl<T> Drop for Session<T>
+where
+    T: SessionHandler + Send + Sync + 'static
+{
+    fn drop(&mut self) {
+        println!("Session.. dropped");
     }
 }

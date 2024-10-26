@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
+use crate::utils::types::types;
 
 pub struct LocalTrack {
     pub audio_local_track: Arc<TrackLocalStaticRTP>,
@@ -44,10 +45,10 @@ impl LocalTrack {
             video_local_track,
         }
     }
-    pub fn get_local_track(&self, kind: &str) -> Arc<TrackLocalStaticRTP> {
+    pub fn get_local_track(&self, kind: types::MediaKind) -> Arc<TrackLocalStaticRTP> {
         match kind {
-            "audio" => self.audio_local_track.clone(),
-            "video" => self.video_local_track.clone(),
+            types::MediaKind::Audio => self.audio_local_track.clone(),
+            types::MediaKind::Video => self.video_local_track.clone(),
             _ => panic!("unsupported kind"),
         }
     }

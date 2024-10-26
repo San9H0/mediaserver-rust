@@ -4,8 +4,9 @@ use crate::codecs::opus::codec::OpusCodec;
 use anyhow::anyhow;
 use ffmpeg_next as ffmpeg;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
+use crate::utils::types::types;
 
-#[derive(Debug, Clone)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum Codec {
     Opus(OpusCodec),
     H264(H264Codec),
@@ -20,7 +21,7 @@ impl Codec {
     //     }
     // }
 
-    pub fn kind(&self) -> &'static str {
+    pub fn kind(&self) -> types::MediaKind {
         match self {
             Codec::Opus(codec) => codec.kind(),
             Codec::H264(codec) => codec.kind(),

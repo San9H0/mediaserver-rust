@@ -15,7 +15,6 @@ struct ReadStats {
     clock_rate: u32,
     total_bytes: u32,
     packet_count: u32,
-    packet_lost: u32,
     base_seq_no: u16,
     max_seq_no: u16,
     cycle: u32,
@@ -29,7 +28,6 @@ impl ReadStats {
             clock_rate,
             total_bytes: 0,
             packet_count: 0,
-            packet_lost: 0,
             base_seq_no: 0,
             max_seq_no: 0,
             cycle: 0,
@@ -79,23 +77,12 @@ impl ReadStats {
 }
 
 pub struct Stats {
-    clock_rate: u32,
     start_time: chrono::DateTime<chrono::Local>,
 
     read_stat: RwLock<ReadStats>,
 
-    total_bytes: u32,
-    packet_count: u32,
-    packet_lost: u32,
-    base_seq_no: u16,
-    max_seq_no: u16,
-    cycle: u32,
-    last_transit: u32,
-    jitter: f64,
-
     prev_expected: std::sync::atomic::AtomicU32,
     prev_packet_lost: std::sync::atomic::AtomicU32,
-    last_sr_rtp_time: std::sync::atomic::AtomicU32,
     last_sr_ntp_time: std::sync::atomic::AtomicU64,
     last_sr_time: std::sync::atomic::AtomicI64,
 }
@@ -103,20 +90,10 @@ pub struct Stats {
 impl Stats {
     pub fn new(clock_rate: u32) -> Arc<Self> {
         Arc::new(Stats {
-            clock_rate,
             start_time: chrono::Local::now(),
             read_stat: RwLock::new(ReadStats::new(clock_rate)),
-            total_bytes: 0,
-            packet_count: 0,
-            packet_lost: 0,
-            base_seq_no: 0,
-            max_seq_no: 0,
-            cycle: 0,
-            last_transit: 0,
-            jitter: 0.0,
             prev_expected: Default::default(),
             prev_packet_lost: Default::default(),
-            last_sr_rtp_time: Default::default(),
             last_sr_ntp_time: Default::default(),
             last_sr_time: Default::default(),
         })

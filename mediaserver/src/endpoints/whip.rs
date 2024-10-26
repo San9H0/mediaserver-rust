@@ -2,15 +2,6 @@ use crate::endpoints::Container;
 use actix_web::{web, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 
-#[derive(Clone)]
-pub struct WhipHandler {}
-
-impl WhipHandler {
-    pub fn new() -> Self {
-        WhipHandler {}
-    }
-}
-
 pub async fn handle_whip(
     handler: web::Data<Container>,
     offer: String,

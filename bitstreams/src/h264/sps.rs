@@ -3,6 +3,7 @@ use crate::h264::nal_unit::NalUnit;
 use bytes::Bytes;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SPS {
     pub payload: Bytes,
     pub profile_idc: u8,

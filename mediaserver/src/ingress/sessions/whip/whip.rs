@@ -238,22 +238,7 @@ impl WhipSession {
         remote: &Arc<TrackRemote>,
         receiver: &Arc<RTCRtpReceiver>,
         stats: &Arc<Stats>,
-    ) -> anyhow::Result<()>{
-
-        // let codec_info = Opus(OpusCodec::new());
-        // let name_filename = "output2.mp4";
-        // let mut output_ctx = ffmpeg::format::output(&name_filename)?;
-        // let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
-        //     .ok_or(ffmpeg::Error::EncoderNotFound)?;
-        // let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
-        // let mut audio = encoder_ctx.encoder().audio()?;
-        // let a = codec_info.set_av_audio(&mut audio);
-        // let encoder = audio.open_as(codec)?;
-        // output_ctx.add_stream_with(&encoder)?;
-        // output_ctx.write_header()?;
-
-
-
+    ) {
         let self_ = self.clone();
         let remote_ = remote.clone();
         let receiver_ = receiver.clone();
@@ -278,15 +263,6 @@ impl WhipSession {
             let mut last_ts = 0;
             let mut duration = 0;
             let mut timebase = remote_.codec().capability.clock_rate;
-            let mut ts_offset = 0;
-            let mut prev_pts = 0;
-            let mut test_prev_ts = 0;
-
-            //
-            // let mut record_pts = 0;
-            // let mut record_dts = 0;
-            // let mut record_base_ts = 0;
-            // let mut record_set_pts = false;
             loop {
                 tokio::select! {
                     _ = self_.token.cancelled() => {
@@ -328,65 +304,14 @@ impl WhipSession {
                                 marker,
                                 frame_info,
                             }).await;
-
-                            // let unit = HubUnit {
-                            //     payload,
-                            //     pts,
-                            //     dts,
-                            //     duration,
-                            //     timebase,
-                            //     marker,
-                            //     frame_info,
-                            // };
-                            //
-                            //
-                            // if !record_set_pts {
-                            //     record_set_pts = true;
-                            //     record_base_ts = unit.pts;
-                            // }
-                            // record_pts = unit.pts - record_base_ts;
-                            // record_dts = unit.dts - record_base_ts;
-                            //
-                            // let data_len = unit.payload.len() as u32;
-                            // let mut buffer = BytesMut::with_capacity(unit.payload.len());
-                            // buffer.extend_from_slice(&unit.payload);
-                            // let data = buffer.freeze();
-                            //
-                            // let input_time_base = ffmpeg::Rational::new(1, unit.timebase as i32);
-                            // let output_time_base = ffmpeg::Rational::new(1, codec_info.clock_rate() as i32);
-                            //
-                            // let mut pkt = ffmpeg::packet::Packet::copy(data.iter().as_slice());
-                            // pkt.set_stream(0);
-                            // pkt.set_pts(Some((pts as i64).rescale(input_time_base, output_time_base)));
-                            // pkt.set_dts(Some((dts as i64).rescale(input_time_base, output_time_base)));
-                            // pkt.set_duration((unit.duration as i64).rescale_with(
-                            //     input_time_base,
-                            //     output_time_base,
-                            //     ffmpeg::mathematics::Rounding::NearInfinity,
-                            // ));
-                            // if unit.frame_info.flag == 1 {
-                            //     pkt.set_flags(ffmpeg::packet::Flags::KEY);
-                            // }
-                            // {
-                            //     println!("write pkt pts:{:?}, dts:{:?}, duration:{:?}, flag:{}", pkt.pts(), pkt.dts(), unit.duration, unit.frame_info.flag);
-                            //     if let Err(err) = pkt.write_interleaved(&mut output_ctx) {
-                            //         log::warn!("failed to write packet: {}", err);
-                            //         continue;
-                            //     };
-                            //     println!("end write pkt pts:{:?}, dts:{:?}, duration:{:?}, flag:{}", pkt.pts(), pkt.dts(), unit.duration, unit.frame_info.flag);
-                            // }
                         }
                     }
                 }
             }
-            //
-            // output_ctx.write_trailer();
 
             self_.hub_stream.remove_source(source.clone()).await;
             source.stop();
         });
-
-        Ok(())
     }
 
 
@@ -421,9 +346,6 @@ impl WhipSession {
             let mut last_ts = 0;
             let mut duration = 0;
             let mut timebase = remote_.codec().capability.clock_rate;
-            let mut ts_offset = 0;
-            let mut prev_pts = 0;
-            let mut test_prev_ts = 0;
             loop {
                 tokio::select! {
                     _ = self_.token.cancelled() => {

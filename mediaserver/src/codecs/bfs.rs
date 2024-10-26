@@ -18,7 +18,7 @@ impl Bfs {
         }
     }
 
-    pub fn make_packet(&self, unit: &HubUnit) -> ffmpeg::packet::Packet {
+    pub fn make_packet(&self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
         match self {
             Opus => codecs::opus::bfs::make_packet(unit),
             H264 => codecs::h264::bfs::make_packet_with_avcc(unit),

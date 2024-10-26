@@ -50,13 +50,14 @@ impl RecordServer {
     }
 
     pub async fn stop_session(&self, session_id: String) -> anyhow::Result<()> {
-        let sessions = self.record_sessions
-            .read()
+        let mut sessions = self.record_sessions
+            .write()
             .await;
-        let sess = sessions
-            .get(&session_id)
+        let session = sessions
+            .remove(&session_id)
             .ok_or(anyhow::anyhow!("session not found"))?;
-        sess.stop();
+        session.stop();
+        println!("sessions count:{}", sessions.iter().count());
         Ok(())
     }
 }

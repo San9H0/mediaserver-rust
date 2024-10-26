@@ -21,6 +21,7 @@ use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecParameters, RTPCodecType};
 use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
 use webrtc::track::track_local::TrackLocalWriter;
 use webrtc::track::track_remote::TrackRemote;
+use crate::utils::types::types;
 
 pub struct WhepSession {
     pc: RTCPeerConnection,
@@ -39,7 +40,7 @@ impl WhepSession {
             let codec = source.get_codec().await.unwrap();
             let mut payload_type = 96;
             let mut kind = RTPCodecType::Video;
-            if codec.kind() == "audio" {
+            if codec.kind() == types::MediaKind::Audio {
                 payload_type = 111;
                 kind = RTPCodecType::Audio;
             }
@@ -68,10 +69,12 @@ impl WhepSession {
     pub fn stop(self: &Arc<Self>) {
         self.token.cancel();
     }
-    pub async fn run(self: &Arc<Self>) {
-        self.read_source().await;
+    pub async fn run(self: &Arc<Self>) -> anyhow::Result<()>{
+        self.read_source().await?;
         self.token.cancelled().await;
         let _ = self.pc.close().await;
+
+        Ok(())
     }
 
     pub async fn init(self: &Arc<Self>, offer: String) -> anyhow::Result<String> {
@@ -110,13 +113,13 @@ impl WhepSession {
 
         Ok(answer_sdp.sdp)
     }
-    async fn read_source(self: &Arc<Self>) {
+    async fn read_source(self: &Arc<Self>) -> anyhow::Result<()> {
         let (tx, mut rx) = mpsc::channel::<()>(100);
         for source in self.hub_stream.get_sources().await {
             let codec = source.get_codec().await.unwrap();
             let kind = codec.kind();
-            let local_track = self.local_track.get_local_track(&codec.kind());
-            let track = source.get_track().await;
+            let local_track = self.local_track.get_local_track(codec.kind());
+            let track = source.get_track(&codec).await?;
             let sink = track.add_sink().await;
             let payloader = RtpPayloader::new(codec.mime_type()).unwrap();
             let mut packetizer = RtpPacketizer::new(payloader, codec.clock_rate());
@@ -132,7 +135,7 @@ impl WhepSession {
                                 break;
                             };
 
-                            if !sent_key_frame && codec.kind() == "video" {
+                            if !sent_key_frame && codec.kind() == types::MediaKind::Video {
                                 let nalu = unit.payload[0] & 0x1F;
                                 if nalu == 1 {
                                     continue
@@ -153,6 +156,8 @@ impl WhepSession {
                 }
             });
         }
+
+        Ok(())
     }
     fn on_ice_candidate(
         self: &Arc<Self>,

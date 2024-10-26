@@ -65,11 +65,9 @@ impl H264RtpParser {
                     flag = 1;
                     self.sps_temp = Some(payload.clone());
                     self.pps_temp = None;
-                    return false; // drop
                 } else if nalu_type == NALUType::PPS {
                     flag = 1;
                     self.pps_temp = Some(payload.clone());
-                    return false; // drop
                 }
                 !matches!(
                     nalu_type,

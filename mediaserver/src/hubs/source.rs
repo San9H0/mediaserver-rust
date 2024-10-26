@@ -8,7 +8,7 @@ use tokio::sync::{broadcast, RwLock};
 use tokio_util::sync::CancellationToken;
 
 pub struct HubSource {
-    tracks: RwLock<HashMap<String, Arc<HubTrack>>>,
+    tracks: RwLock<HashMap<Codec, Arc<HubTrack>>>,
     tx: broadcast::Sender<HubUnit>,
     token: CancellationToken,
     codec: RwLock<Option<Codec>>,
@@ -40,29 +40,36 @@ impl HubSource {
         self.codec.read().await.clone()
     }
 
-    pub async fn get_track(self: &Arc<Self>) -> Arc<HubTrack> {
-        let key: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10) // 길이 10의 랜덤 문자열 생성
-            .map(char::from)
-            .collect(); // TODO 임시 코드
+    pub async fn get_track(self: &Arc<Self>, transcoding_codec: &Codec) -> anyhow::Result<Arc<HubTrack>> {
+        let source_codec = self.get_codec().await.ok_or(anyhow::anyhow!("no codec"))?;
+        let hub_track = {
+            let mut tracks = self.tracks
+                .write()
+                .await;
+            tracks
+                .entry(transcoding_codec.clone())
+                .or_insert_with(|| HubTrack::new())
+                .clone()
+        };
 
-        let hub_track = HubTrack::new();
-        let _track = hub_track.clone();
+        let result = hub_track.clone();
+
         let rx = self.tx.subscribe();
         let _self = self.clone();
-        let _key = key.clone();
+        let key = transcoding_codec.clone();
         tokio::spawn(async move {
-            _track.run(rx, _self.token.clone()).await;
-            _self.tracks.write().await.remove(&_key);
+            hub_track
+                .run(rx, _self.token.clone())
+                .await;
+
+            _self.tracks
+                .write()
+                .await
+                .remove(&key);
         });
 
-        self.tracks
-            .write()
-            .await
-            .insert(key.clone(), hub_track.clone());
 
-        hub_track
+        Ok(result)
     }
 
     pub async fn write_unit(&self, unit: HubUnit) {
