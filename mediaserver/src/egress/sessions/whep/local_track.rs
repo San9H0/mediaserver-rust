@@ -49,7 +49,6 @@ impl LocalTrack {
         match kind {
             types::MediaKind::Audio => self.audio_local_track.clone(),
             types::MediaKind::Video => self.video_local_track.clone(),
-            _ => panic!("unsupported kind"),
         }
     }
 }

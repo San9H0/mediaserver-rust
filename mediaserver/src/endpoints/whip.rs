@@ -9,17 +9,22 @@ pub async fn handle_whip(
 ) -> impl Responder {
     let token = auth.token().to_owned();
 
-    let answer = match handler
+    log::info!("whip stream_id:{}, offer:{}", token, offer);
+
+    let result = handler
         .whip_server
-        .start_session(token.to_owned(), offer.to_string())
-        .await
-    {
+        .start_session(token, &offer)
+        .await;
+
+    let answer = match result {
         Ok(answer) => answer,
         Err(e) => {
             log::error!("whip error:{}", e);
             return HttpResponse::InternalServerError().finish();
         }
     };
+
+    log::info!("whip answer:{}", answer);
 
     HttpResponse::Created()
         .insert_header(("Content-Type", "application/sdp"))

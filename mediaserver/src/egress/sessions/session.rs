@@ -8,6 +8,7 @@ use crate::utils::types::types;
 
 pub trait SessionHandler {
     type TrackContext: Send + Sync + 'static;
+    fn session_id(&self) -> String;
     fn on_initialize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
         async { Ok(()) }
     }
@@ -46,6 +47,9 @@ where
         Arc::new(Session {
             handler,
         })
+    }
+    pub fn session_id(&self) -> String {
+        self.handler.session_id()
     }
 
     pub fn stop(self: &Arc<Self>) {

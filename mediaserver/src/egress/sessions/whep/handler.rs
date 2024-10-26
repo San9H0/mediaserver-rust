@@ -170,6 +170,10 @@ impl WhepHandler {
 impl SessionHandler for WhepHandler {
     type TrackContext = track_context::TrackContext;
 
+    fn session_id(&self) -> String {
+        self.session_id().clone()
+    }
+
     fn stop(&self) {
         self.token.cancel();
     }
@@ -196,10 +200,8 @@ impl SessionHandler for WhepHandler {
         let Ok(packets) = ctx.make_packet(unit) else {
             return;
         };
-        println!("packets count:{}", packets.len());
         let mut local_track = self.local_track.get_local_track(types::MediaKind::Video);
         for packet in packets.iter() {
-            println!("write video rtp sn:{}, ts:{}", packet.header.sequence_number, packet.header.timestamp);
             if let Err(err) = local_track.write_rtp(packet).await {
                 log::warn!("write rtp failed: {:?}", err);
             };

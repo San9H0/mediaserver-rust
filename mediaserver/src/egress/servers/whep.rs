@@ -26,6 +26,7 @@ impl WhepServer {
         let hub_stream = self
             .hub
             .get_stream(&stream_id)
+            .await
             .ok_or(anyhow::anyhow!("stream not found"))?;
 
         let session_id = Uuid::new_v4().to_string();

@@ -48,7 +48,7 @@ pub struct WhipSession {
 }
 
 impl WhipSession {
-    pub async fn new(hub_stream: Arc<HubStream>) -> Arc<Self> {
+    pub async fn new() -> Arc<Self> {
         // let api = WebRtcApi::new();
         let mut media_engine = MediaEngine::default();
         let result = media_engine.register_codec(
@@ -87,11 +87,14 @@ impl WhipSession {
         let token = CancellationToken::new();
         Arc::new(WhipSession {
             pc,
-            hub_stream,
+            hub_stream: HubStream::new(),
             token,
         })
     }
 
+    pub fn hub_stream(&self) -> Arc<HubStream> {
+        self.hub_stream.clone()
+    }
     pub fn stop(&self) {
         self.token.cancel();
     }
@@ -99,7 +102,7 @@ impl WhipSession {
         self.token.cancelled().await;
         let _ = self.pc.close().await;
     }
-    pub async fn init(self: &Arc<Self>, offer: String) -> anyhow::Result<String> {
+    pub async fn init(self: &Arc<Self>, offer: &str) -> anyhow::Result<String> {
         let (end_candidate, mut wait_candidate) = mpsc::channel(1);
         self.pc
             .on_ice_candidate(self.on_ice_candidate(end_candidate));
@@ -108,7 +111,7 @@ impl WhipSession {
         self.pc.on_track(self.on_track());
 
         self.pc
-            .set_remote_description(RTCSessionDescription::offer(offer)?)
+            .set_remote_description(RTCSessionDescription::offer(offer.to_string())?)
             .await?;
         let answer = self.pc.create_answer(None).await?;
         self.pc.set_local_description(answer).await?;
@@ -241,13 +244,12 @@ impl WhipSession {
     ) {
         let self_ = self.clone();
         let remote_ = remote.clone();
-        let receiver_ = receiver.clone();
         let mut stats_ = stats.clone();
         tokio::spawn(async move {
             let source = HubSource::new();
             self_.hub_stream.add_source(source.clone()).await;
 
-            let mut source_1 = source.clone();
+            let source_1 = source.clone();
             let mut parser = RtpParser::new(&remote_.codec().capability.mime_type,
                 Box::new(move |codec: Codec| {
                     let source = source_1.clone();
@@ -324,13 +326,12 @@ impl WhipSession {
 
         let self_ = self.clone();
         let remote_ = remote.clone();
-        let receiver_ = receiver.clone();
-        let mut stats_ = stats.clone();
+        let stats_ = stats.clone();
         tokio::spawn(async move {
             let source = HubSource::new();
             self_.hub_stream.add_source(source.clone()).await;
 
-            let mut source_1 = source.clone();
+            let source_1 = source.clone();
             let mut parser = RtpParser::new(&remote_.codec().capability.mime_type,
                                             Box::new(move |codec: Codec| {
                                                 let source = source_1.clone();
@@ -345,7 +346,7 @@ impl WhipSession {
             let mut start_ts = 0;
             let mut last_ts = 0;
             let mut duration = 0;
-            let mut timebase = remote_.codec().capability.clock_rate;
+            let timebase = remote_.codec().capability.clock_rate;
             loop {
                 tokio::select! {
                     _ = self_.token.cancelled() => {

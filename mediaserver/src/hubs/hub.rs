@@ -1,31 +1,45 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
+use tokio::sync::RwLock;
 use crate::hubs::stream;
+use crate::hubs::stream::HubStream;
 
 pub struct Hub {
-    streams_map: RwLock<HashMap<String, Arc<stream::HubStream>>>,
+    streams: RwLock<HashMap<String, Arc<HubStream>>>,
 }
 
 impl Hub {
     pub fn new() -> Arc<Self> {
         Arc::new(Hub {
-            streams_map: RwLock::new(HashMap::new()),
+            streams: RwLock::new(HashMap::new()),
         })
     }
 
-    pub fn insert_stream(&self, id: &str, stream: Arc<stream::HubStream>) {
-        self.streams_map
+    pub async fn insert_stream(&self, id: &str, stream: &Arc<HubStream>) {
+        self.streams
             .write()
-            .unwrap()
-            .insert(id.to_string(), stream);
+            .await
+            .insert(id.to_string(), stream.clone());
     }
 
-    pub fn remove_stream(&self, id: &str) {
-        self.streams_map.write().unwrap().remove(id);
+    pub async fn remove_stream(&self, id: &str, stream: &Arc<HubStream>) {
+        let mut streams = self.streams
+            .write()
+            .await;
+        let Some(get_stream) = streams.get(id) else {
+            return;
+        };
+        if get_stream != stream {
+            return;
+        }
+        streams.remove(id);
     }
 
-    pub fn get_stream(&self, id: &str) -> Option<Arc<stream::HubStream>> {
-        self.streams_map.read().unwrap().get(id).cloned()
+    pub async fn get_stream(&self, id: &str) -> Option<Arc<HubStream>> {
+        let streams = self.streams
+            .read()
+            .await;
+        streams.get(id).cloned()
     }
 }

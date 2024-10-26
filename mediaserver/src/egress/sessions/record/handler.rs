@@ -20,6 +20,7 @@ use crate::utils::files::directory::create_directory_if_not_exists;
 use crate::utils::types::types;
 
 pub struct RecordHandler {
+    session_id: String,
     started: AtomicBool,
     token: CancellationToken,
 
@@ -60,6 +61,7 @@ impl RecordHandler {
         }
 
         Ok(RecordHandler {
+            session_id: session_id.to_string(),
             started: AtomicBool::new(false),
             token,
             output_ctx: Arc::new(Mutex::new(output_ctx)),
@@ -72,6 +74,9 @@ impl RecordHandler {
 
 impl SessionHandler for RecordHandler {
     type TrackContext = track_context::TrackContext;
+    fn session_id(&self) -> String {
+        self.session_id.clone()
+    }
     async fn on_initialize(&self) -> anyhow::Result<()> {
         let mut output_ctx = self.output_ctx.lock().await;
         output_ctx.write_header()?;

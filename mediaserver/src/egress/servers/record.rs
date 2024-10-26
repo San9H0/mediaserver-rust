@@ -22,10 +22,11 @@ impl RecordServer {
         })
     }
 
-    pub async fn start_session(&self, stream_id: &str) -> anyhow::Result<String> {
+    pub async fn start_session(self: &Arc<Self>, stream_id: &str) -> anyhow::Result<String> {
         let hub_stream = self
             .hub
             .get_stream(&stream_id)
+            .await
             .ok_or(anyhow::anyhow!("stream not found"))?;
 
         let session_id = Uuid::new_v4().to_string();
@@ -34,15 +35,26 @@ impl RecordServer {
         let handler = RecordHandler::new(&hub_stream, &session_id).await?;
         let sess = Session::new(handler);
 
+        let server = self.clone();
         self.record_sessions
             .write()
             .await
             .insert(session_id.to_string(), sess.clone());
 
         tokio::spawn(async move {
+            let session_id = sess.session_id();
+
+            server.record_sessions
+                .write()
+                .await
+                .insert(session_id.clone(), sess.clone());
+
             if let Err(err) = sess.run().await {
                 log::warn!("write file failed: {:?}", err);
             }
+
+            let _ = server.stop_session(session_id)
+                .await;
         });
 
 
@@ -57,7 +69,7 @@ impl RecordServer {
             .remove(&session_id)
             .ok_or(anyhow::anyhow!("session not found"))?;
         session.stop();
-        println!("sessions count:{}", sessions.iter().count());
+        log::info!("record session stopped: {}", session_id);
         Ok(())
     }
 }

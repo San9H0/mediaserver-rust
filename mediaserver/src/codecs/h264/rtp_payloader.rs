@@ -21,7 +21,6 @@ impl H264RtpPayloader {
 impl H264RtpPayloader {
     pub fn payload(&mut self, mtu: usize, payload: &Bytes) -> anyhow::Result<Vec<Bytes>> {
         let nalu_type = NALUType::from_byte(payload[0]);
-        println!("whep h264 payloader nalu type: {:?}", nalu_type);
         if nalu_type == NALUType::SPS || nalu_type == NALUType::PPS {
             self.send_keyframe = true;
         } else if !self.send_keyframe {
