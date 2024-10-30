@@ -1,9 +1,9 @@
+use crate::codecs::h264::config::Config;
+use crate::utils::types::types;
+use ffmpeg_next as ffmpeg;
 use std::hash::Hash;
 use std::ptr;
-use crate::codecs::h264::config::Config;
-use ffmpeg_next as ffmpeg;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
-use crate::utils::types::types;
 
 #[derive(Debug, Clone)]
 pub struct H264Codec {
@@ -49,12 +49,10 @@ impl H264Codec {
         &self,
         video: &mut ffmpeg::codec::encoder::video::Video,
     ) -> anyhow::Result<()> {
-
         video.set_width(self.config.sps.width());
         video.set_height(self.config.sps.height());
         video.set_format(ffmpeg::format::Pixel::YUV420P);
         video.set_time_base(ffmpeg::Rational::new(1, 30));
-
 
         unsafe {
             let extradata = self.config.extradata();
@@ -70,18 +68,17 @@ impl H264Codec {
 
 impl PartialEq for H264Codec {
     fn eq(&self, other: &Self) -> bool {
-        self.kind() == other.kind() &&
-        self.mime_type() == other.mime_type() &&
-        self.clock_rate() == other.clock_rate() &&
-        self.channels() == other.channels() &&
-        self.samples() == other.samples() &&
-            self.config.width() == other.config.width() &&
-            self.config.height() == other.config.height()
+        self.kind() == other.kind()
+            && self.mime_type() == other.mime_type()
+            && self.clock_rate() == other.clock_rate()
+            && self.channels() == other.channels()
+            && self.samples() == other.samples()
+            && self.config.width() == other.config.width()
+            && self.config.height() == other.config.height()
     }
 }
 
-impl Eq for H264Codec {
-}
+impl Eq for H264Codec {}
 
 impl Hash for H264Codec {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {

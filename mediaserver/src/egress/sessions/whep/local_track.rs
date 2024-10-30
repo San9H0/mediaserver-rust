@@ -1,7 +1,7 @@
+use crate::utils::types::types;
 use std::sync::Arc;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
-use crate::utils::types::types;
 
 pub struct LocalTrack {
     pub audio_local_track: Arc<TrackLocalStaticRTP>,

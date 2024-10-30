@@ -11,10 +11,7 @@ pub async fn handle_whip(
 
     log::info!("whip stream_id:{}, offer:{}", token, offer);
 
-    let result = handler
-        .whip_server
-        .start_session(token, &offer)
-        .await;
+    let result = handler.whip_server.start_session(token, &offer).await;
 
     let answer = match result {
         Ok(answer) => answer,

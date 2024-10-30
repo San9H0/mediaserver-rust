@@ -29,7 +29,6 @@ impl HubStream {
     }
 }
 
-
 // HubStream 타입에 PartialEq 구현
 impl PartialEq for HubStream {
     fn eq(&self, other: &Self) -> bool {

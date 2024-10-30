@@ -1,7 +1,10 @@
 use crate::codecs;
 use crate::codecs::codec::Codec;
+use crate::codecs::codec::Codec::Opus;
 use crate::codecs::h264::rtp_parser::MyParser;
+use crate::codecs::opus::codec::OpusCodec;
 use crate::codecs::rtp_parser::RtpParser;
+use crate::egress::sessions::record::handler::RecordHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
@@ -9,12 +12,14 @@ use crate::ingress::sessions::whip::stats::Stats;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use anyhow::anyhow;
 use bytes::{Bytes, BytesMut};
+use ffmpeg_next as ffmpeg;
+use ffmpeg_next::Rescale;
+use futures::lock::Mutex;
 use std::cell::RefCell;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
-use futures::lock::Mutex;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio_util::sync::CancellationToken;
@@ -35,11 +40,6 @@ use webrtc::rtp_transceiver::rtp_codec::{
 };
 use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
 use webrtc::track::track_remote::TrackRemote;
-use crate::egress::sessions::record::handler::RecordHandler;
-use ffmpeg_next as ffmpeg;
-use ffmpeg_next::Rescale;
-use crate::codecs::codec::Codec::Opus;
-use crate::codecs::opus::codec::OpusCodec;
 
 pub struct WhipSession {
     pc: RTCPeerConnection,
@@ -250,7 +250,8 @@ impl WhipSession {
             self_.hub_stream.add_source(source.clone()).await;
 
             let source_1 = source.clone();
-            let mut parser = RtpParser::new(&remote_.codec().capability.mime_type,
+            let mut parser = RtpParser::new(
+                &remote_.codec().capability.mime_type,
                 Box::new(move |codec: Codec| {
                     let source = source_1.clone();
                     Box::pin(async move {
@@ -316,14 +317,12 @@ impl WhipSession {
         });
     }
 
-
     fn read_rtp_video(
         self: &Arc<Self>,
         remote: &Arc<TrackRemote>,
         receiver: &Arc<RTCRtpReceiver>,
         stats: &Arc<Stats>,
     ) {
-
         let self_ = self.clone();
         let remote_ = remote.clone();
         let stats_ = stats.clone();
@@ -332,17 +331,18 @@ impl WhipSession {
             self_.hub_stream.add_source(source.clone()).await;
 
             let source_1 = source.clone();
-            let mut parser = RtpParser::new(&remote_.codec().capability.mime_type,
-                                            Box::new(move |codec: Codec| {
-                                                let source = source_1.clone();
-                                                Box::pin(async move {
-                                                    log::info!("whip set codec: {:?}", codec.mime_type());
-                                                    source.set_codec(codec).await;
-                                                })
-                                            }),
+            let mut parser = RtpParser::new(
+                &remote_.codec().capability.mime_type,
+                Box::new(move |codec: Codec| {
+                    let source = source_1.clone();
+                    Box::pin(async move {
+                        log::info!("whip set codec: {:?}", codec.mime_type());
+                        source.set_codec(codec).await;
+                    })
+                }),
             )
-                .map_err(|err| log::warn!("unsupported codec: {:?}", err))
-                .unwrap();
+            .map_err(|err| log::warn!("unsupported codec: {:?}", err))
+            .unwrap();
             let mut start_ts = 0;
             let mut last_ts = 0;
             let mut duration = 0;

@@ -1,8 +1,8 @@
-use ffmpeg_next as ffmpeg;
-use ffmpeg_next::Rescale;
 use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
 use crate::hubs::unit::HubUnit;
+use ffmpeg_next as ffmpeg;
+use ffmpeg_next::Rescale;
 
 pub struct TrackContext {
     codec: Codec,
@@ -47,10 +47,13 @@ impl TrackContext {
         let input_time_base = ffmpeg::Rational::new(1, unit.timebase as i32);
         let output_time_base = ffmpeg::Rational::new(1, self.codec.clock_rate() as i32);
 
-
         pkt.set_stream(self.idx);
-        pkt.set_pts(Some((self.pts as i64).rescale(input_time_base, output_time_base)));
-        pkt.set_dts(Some((self.dts as i64).rescale(input_time_base, output_time_base)));
+        pkt.set_pts(Some(
+            (self.pts as i64).rescale(input_time_base, output_time_base),
+        ));
+        pkt.set_dts(Some(
+            (self.dts as i64).rescale(input_time_base, output_time_base),
+        ));
         pkt.set_duration((unit.duration as i64).rescale_with(
             input_time_base,
             output_time_base,

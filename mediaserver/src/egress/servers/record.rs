@@ -1,11 +1,11 @@
+use crate::egress::sessions::record::handler::RecordHandler;
+use crate::egress::sessions::session::{Session, SessionHandler};
 use crate::hubs::hub::Hub;
-use uuid::Uuid;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time;
-use crate::egress::sessions::record::handler::RecordHandler;
-use crate::egress::sessions::session::{Session, SessionHandler};
+use uuid::Uuid;
 
 pub struct RecordServer {
     hub: Arc<Hub>,
@@ -44,7 +44,8 @@ impl RecordServer {
         tokio::spawn(async move {
             let session_id = sess.session_id();
 
-            server.record_sessions
+            server
+                .record_sessions
                 .write()
                 .await
                 .insert(session_id.clone(), sess.clone());
@@ -53,18 +54,14 @@ impl RecordServer {
                 log::warn!("write file failed: {:?}", err);
             }
 
-            let _ = server.stop_session(session_id)
-                .await;
+            let _ = server.stop_session(session_id).await;
         });
-
 
         Ok(session_id)
     }
 
     pub async fn stop_session(&self, session_id: String) -> anyhow::Result<()> {
-        let mut sessions = self.record_sessions
-            .write()
-            .await;
+        let mut sessions = self.record_sessions.write().await;
         let session = sessions
             .remove(&session_id)
             .ok_or(anyhow::anyhow!("session not found"))?;

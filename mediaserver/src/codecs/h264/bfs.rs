@@ -1,8 +1,8 @@
-use ffmpeg_next as ffmpeg;
 use crate::codecs::h264::format::NALUType;
 use crate::hubs::unit::HubUnit;
+use ffmpeg_next as ffmpeg;
 
-pub fn make_packet_with_avcc(unit: &HubUnit) -> Option<ffmpeg::packet::Packet>{
+pub fn make_packet_with_avcc(unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
     let nalu_type = NALUType::from_byte(unit.payload[0]);
     if nalu_type == NALUType::SPS || nalu_type == NALUType::PPS {
         return None;

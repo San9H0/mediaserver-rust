@@ -25,14 +25,9 @@ impl WhipServer {
         tokio::spawn(async move {
             let stream_id = stream_id.to_string();
             let hub_stream = whip_session.hub_stream();
-            server.hub
-                .insert_stream(&stream_id, &hub_stream)
-                .await;
-            whip_session.run()
-                .await;
-            server.hub
-                .remove_stream(&stream_id, &hub_stream)
-                .await;
+            server.hub.insert_stream(&stream_id, &hub_stream).await;
+            whip_session.run().await;
+            server.hub.remove_stream(&stream_id, &hub_stream).await;
         });
 
         Ok(answer)

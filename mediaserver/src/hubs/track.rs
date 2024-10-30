@@ -49,17 +49,12 @@ impl HubTrack {
         let rx = self.tx.subscribe();
         let hub_sink = HubSink::new(rx);
         let _hub_sink = hub_sink.clone();
-        self.sinks
-            .write()
-            .await
-            .push(hub_sink.clone());
+        self.sinks.write().await.push(hub_sink.clone());
         hub_sink
     }
 
     pub async fn remove_sink(self: &Arc<Self>, sink: &Arc<HubSink>) {
-        let mut sinks = self.sinks
-            .write()
-            .await;
+        let mut sinks = self.sinks.write().await;
         sinks.retain(|s| !Arc::ptr_eq(s, sink));
     }
 }

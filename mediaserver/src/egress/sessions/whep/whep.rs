@@ -3,6 +3,7 @@ use crate::codecs::rtp_packetizer::RtpPacketizer;
 use crate::codecs::rtp_payloader::RtpPayloader;
 use crate::egress::sessions::whep::local_track::LocalTrack;
 use crate::hubs::stream::HubStream;
+use crate::utils::types::types;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use anyhow::anyhow;
 use std::sync::Arc;
@@ -21,7 +22,6 @@ use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecParameters, RTPCodecType};
 use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
 use webrtc::track::track_local::TrackLocalWriter;
 use webrtc::track::track_remote::TrackRemote;
-use crate::utils::types::types;
 
 pub struct WhepSession {
     pc: RTCPeerConnection,
@@ -69,7 +69,7 @@ impl WhepSession {
     pub fn stop(self: &Arc<Self>) {
         self.token.cancel();
     }
-    pub async fn run(self: &Arc<Self>) -> anyhow::Result<()>{
+    pub async fn run(self: &Arc<Self>) -> anyhow::Result<()> {
         self.read_source().await?;
         self.token.cancelled().await;
         let _ = self.pc.close().await;

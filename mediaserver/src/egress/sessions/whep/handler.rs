@@ -1,37 +1,39 @@
-use std::cmp::PartialEq;
-use std::future::Future;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use anyhow::anyhow;
-use tokio_util::sync::CancellationToken;
-use crate::hubs::stream::HubStream;
-use ffmpeg_next as ffmpeg;
-use ffmpeg_next::format::context;
-use ffmpeg_next::Rescale;
-use ffmpeg_sys_next::sprintf;
-use tokio::sync::{mpsc, Mutex};
-use tokio::time;
-use webrtc::api::media_engine::MediaEngine;
-use webrtc::ice_transport::ice_candidate::RTCIceCandidate;
-use webrtc::ice_transport::ice_gatherer::OnLocalCandidateHdlrFn;
-use webrtc::peer_connection::{OnPeerConnectionStateChangeHdlrFn, OnTrackHdlrFn, RTCPeerConnection};
-use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
-use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
-use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecParameters, RTPCodecType};
-use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
-use webrtc::track::track_local::TrackLocalWriter;
-use webrtc::track::track_remote::TrackRemote;
 use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
-use crate::egress::sessions::whep::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::egress::sessions::whep::local_track::LocalTrack;
+use crate::egress::sessions::whep::track_context;
 use crate::egress::sessions::whep::whep::WhepSession;
 use crate::hubs::source::HubSource;
+use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
 use crate::utils::files::directory::create_directory_if_not_exists;
 use crate::utils::types::types;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
+use anyhow::anyhow;
+use ffmpeg_next as ffmpeg;
+use ffmpeg_next::format::context;
+use ffmpeg_next::Rescale;
+use ffmpeg_sys_next::sprintf;
+use std::cmp::PartialEq;
+use std::future::Future;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
+use tokio::time;
+use tokio_util::sync::CancellationToken;
+use webrtc::api::media_engine::MediaEngine;
+use webrtc::ice_transport::ice_candidate::RTCIceCandidate;
+use webrtc::ice_transport::ice_gatherer::OnLocalCandidateHdlrFn;
+use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
+use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
+use webrtc::peer_connection::{
+    OnPeerConnectionStateChangeHdlrFn, OnTrackHdlrFn, RTCPeerConnection,
+};
+use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecParameters, RTPCodecType};
+use webrtc::rtp_transceiver::rtp_receiver::RTCRtpReceiver;
+use webrtc::track::track_local::TrackLocalWriter;
+use webrtc::track::track_remote::TrackRemote;
 
 pub struct WhepHandler {
     pc: RTCPeerConnection,
@@ -46,7 +48,7 @@ impl WhepHandler {
     pub async fn new(hub_stream: &Arc<HubStream>, session_id: &str) -> anyhow::Result<Arc<Self>> {
         let token = CancellationToken::new();
         let local_track = LocalTrack::new();
-        let mut sources =  vec![];
+        let mut sources = vec![];
         let mut media_engine = MediaEngine::default();
         for source in hub_stream.get_sources().await.iter() {
             let codec = source.get_codec().await.unwrap();
@@ -165,8 +167,6 @@ impl WhepHandler {
     }
 }
 
-
-
 impl SessionHandler for WhepHandler {
     type TrackContext = track_context::TrackContext;
 
@@ -192,7 +192,7 @@ impl SessionHandler for WhepHandler {
     async fn on_video(&self, ctx: &mut track_context::TrackContext, unit: &HubUnit) {
         if !self.started.load(Ordering::Acquire) {
             if unit.frame_info.flag != 1 {
-                return
+                return;
             }
             self.started.store(true, Ordering::Release);
         }
@@ -225,4 +225,3 @@ impl SessionHandler for WhepHandler {
         }
     }
 }
-

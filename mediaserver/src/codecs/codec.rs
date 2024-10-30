@@ -1,10 +1,10 @@
-use std::ptr::null;
 use crate::codecs::h264::codec::H264Codec;
 use crate::codecs::opus::codec::OpusCodec;
+use crate::utils::types::types;
 use anyhow::anyhow;
 use ffmpeg_next as ffmpeg;
+use std::ptr::null;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
-use crate::utils::types::types;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum Codec {

@@ -1,5 +1,5 @@
-use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use crate::utils::types::types;
+use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub struct OpusCodec;

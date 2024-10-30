@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
 use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
 use crate::hubs::source::HubSource;
 use crate::hubs::unit::HubUnit;
 use crate::utils::types::types;
+use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 pub trait SessionHandler {
     type TrackContext: Send + Sync + 'static;
@@ -19,12 +19,18 @@ pub trait SessionHandler {
     fn cancel_token(&self) -> CancellationToken;
     fn get_sources(&self) -> Vec<Arc<HubSource>>;
     fn on_track_context(&self, idx: usize, codec: &Codec) -> Self::TrackContext;
-    fn on_video(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) -> impl std::future::Future<Output = ()> + Send;
-    
-    fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) -> impl std::future::Future<Output = ()> + Send;
-    async fn read_hub_stream(&self) {
+    fn on_video(
+        &self,
+        ctx: &mut Self::TrackContext,
+        unit: &HubUnit,
+    ) -> impl std::future::Future<Output = ()> + Send;
 
-    }
+    fn on_audio(
+        &self,
+        ctx: &mut Self::TrackContext,
+        unit: &HubUnit,
+    ) -> impl std::future::Future<Output = ()> + Send;
+    async fn read_hub_stream(&self) {}
 }
 
 pub struct Session<T>
@@ -44,9 +50,7 @@ where
         })
     }
     pub fn from_arc(handler: Arc<T>) -> Arc<Self> {
-        Arc::new(Session {
-            handler,
-        })
+        Arc::new(Session { handler })
     }
     pub fn session_id(&self) -> String {
         self.handler.session_id()
@@ -106,7 +110,7 @@ where
 
 impl<T> Drop for Session<T>
 where
-    T: SessionHandler + Send + Sync + 'static
+    T: SessionHandler + Send + Sync + 'static,
 {
     fn drop(&mut self) {
         println!("Session.. dropped");

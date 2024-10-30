@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use crate::hubs::stream;
 use crate::hubs::stream::HubStream;
+use tokio::sync::RwLock;
 
 pub struct Hub {
     streams: RwLock<HashMap<String, Arc<HubStream>>>,
@@ -24,9 +24,7 @@ impl Hub {
     }
 
     pub async fn remove_stream(&self, id: &str, stream: &Arc<HubStream>) {
-        let mut streams = self.streams
-            .write()
-            .await;
+        let mut streams = self.streams.write().await;
         let Some(get_stream) = streams.get(id) else {
             return;
         };
@@ -37,9 +35,7 @@ impl Hub {
     }
 
     pub async fn get_stream(&self, id: &str) -> Option<Arc<HubStream>> {
-        let streams = self.streams
-            .read()
-            .await;
+        let streams = self.streams.read().await;
         streams.get(id).cloned()
     }
 }
