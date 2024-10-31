@@ -20,18 +20,15 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 pub struct RecordHandler {
-    session_id: String,
     started: AtomicBool,
-    token: CancellationToken,
 
     output_ctx: Arc<Mutex<context::Output>>,
     sources: Vec<Arc<HubSource>>,
 }
 
 impl RecordHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, session_id: &str) -> anyhow::Result<Self> {
-        let token = CancellationToken::new();
-        let name_filename = format!("{}/output.mp4", session_id);
+    pub async fn new(hub_stream: &Arc<HubStream>, base_path: &str) -> anyhow::Result<Self> {
+        let name_filename = format!("{}/output.mp4", base_path);
         create_directory_if_not_exists(&name_filename)?;
 
         let mut output_ctx = ffmpeg::format::output(&name_filename)?;
@@ -60,9 +57,7 @@ impl RecordHandler {
         }
 
         Ok(RecordHandler {
-            session_id: session_id.to_string(),
             started: AtomicBool::new(false),
-            token,
             output_ctx: Arc::new(Mutex::new(output_ctx)),
             sources,
         })
@@ -71,9 +66,6 @@ impl RecordHandler {
 
 impl SessionHandler for RecordHandler {
     type TrackContext = track_context::TrackContext;
-    fn session_id(&self) -> String {
-        self.session_id.clone()
-    }
     async fn on_initialize(&self) -> anyhow::Result<()> {
         let mut output_ctx = self.output_ctx.lock().await;
         output_ctx.write_header()?;
@@ -86,13 +78,6 @@ impl SessionHandler for RecordHandler {
         output_ctx.write_trailer()?;
 
         Ok(())
-    }
-
-    fn stop(&self) {
-        self.token.cancel();
-    }
-    fn cancel_token(&self) -> CancellationToken {
-        self.token.clone()
     }
 
     fn get_sources(&self) -> Vec<Arc<HubSource>> {

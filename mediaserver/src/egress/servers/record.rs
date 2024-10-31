@@ -33,7 +33,7 @@ impl RecordServer {
         log::info!("record session started: {}", &session_id);
 
         let handler = RecordHandler::new(&hub_stream, &session_id).await?;
-        let sess = Session::new(handler);
+        let sess = Session::new(&session_id, handler);;
 
         let server = self.clone();
         self.record_sessions

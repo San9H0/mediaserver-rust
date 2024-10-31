@@ -8,15 +8,12 @@ use tokio_util::sync::CancellationToken;
 
 pub trait SessionHandler {
     type TrackContext: Send + Sync + 'static;
-    fn session_id(&self) -> String;
     fn on_initialize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
         async { Ok(()) }
     }
     fn on_finalize(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
         async { Ok(()) }
     }
-    fn stop(&self);
-    fn cancel_token(&self) -> CancellationToken;
     fn get_sources(&self) -> Vec<Arc<HubSource>>;
     fn on_track_context(&self, idx: usize, codec: &Codec) -> Self::TrackContext;
     fn on_video(
@@ -37,6 +34,8 @@ pub struct Session<T>
 where
     T: SessionHandler + Send + Sync + 'static,
 {
+    session_id: String,
+    token: CancellationToken,
     handler: Arc<T>,
 }
 
@@ -44,20 +43,24 @@ impl<T> Session<T>
 where
     T: SessionHandler + Send + Sync + 'static,
 {
-    pub fn new(handler: T) -> Arc<Self> {
+    pub fn new(session_id: &str, handler: T) -> Arc<Self> {
         Arc::new(Session {
+            session_id: session_id.to_string(),
+            token: CancellationToken::new(),
             handler: Arc::new(handler),
         })
     }
-    pub fn from_arc(handler: Arc<T>) -> Arc<Self> {
-        Arc::new(Session { handler })
-    }
-    pub fn session_id(&self) -> String {
-        self.handler.session_id()
+    pub fn from_arc(session_id: &str, handler: Arc<T>) -> Arc<Self> {
+        Arc::new(Session {
+            session_id: session_id.to_string(),
+            token: CancellationToken::new(),
+            handler,
+        })
     }
 
     pub fn stop(self: &Arc<Self>) {
         self.handler.stop();
+        self.token.cancel();
     }
     pub async fn run(self: &Arc<Self>) -> anyhow::Result<()> {
         self.handler.on_initialize().await?;
@@ -67,7 +70,7 @@ where
             let codec = source.get_codec().await.unwrap();
             let track = source.get_track(&codec).await?;
             let sink = track.add_sink().await;
-            let cancel_token = self.handler.cancel_token();
+            let cancel_token = self.token.clone();
             let self_ = self.clone();
 
             let mut ctx = self_.handler.on_track_context(idx, &codec);

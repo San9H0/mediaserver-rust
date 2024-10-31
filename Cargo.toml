@@ -1,5 +1,5 @@
 [workspace]
 members = [
     "mediaserver",
-    "bitstreams",
+    "bitstreams", "ffmpeg-wrap",
 ]
