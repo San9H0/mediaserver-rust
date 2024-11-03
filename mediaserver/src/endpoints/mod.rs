@@ -9,6 +9,7 @@ pub mod error;
 mod file;
 pub mod whep;
 pub mod whip;
+mod hls;
 
 pub async fn myf(failed: bool) -> error::Result<impl Responder> {
     if failed {
@@ -25,6 +26,7 @@ pub async fn build(hub: Arc<Hub>) -> std::io::Result<()> {
                 whip_server: ingress::servers::whip::WhipServer::new(hub.clone()),
                 whep_server: egress::servers::whep::WhepServer::new(hub.clone()),
                 record_server: egress::servers::record::RecordServer::new(hub.clone()),
+                hls_server: egress::servers::hls::HlsServer::new(hub.clone()),
             }))
             .wrap(Logger::default())
             .configure(routes)
@@ -39,9 +41,8 @@ fn routes(app: &mut web::ServiceConfig) {
     app.service(web::resource("/v1/whip").route(web::post().to(whip::handle_whip)))
         .service(web::resource("/v1/whep").route(web::post().to(whep::handle_whep)))
         .service(web::resource("/v1/record").route(web::post().to(file::handle_create_record)))
-        .service(
-            web::resource("/v1/record/{session_id}")
-                .route(web::delete().to(file::handle_delete_record)),
+        .service(web::resource("/v1/hls").route(web::post().to(hls::handle_create_hls)))
+        .service(web::resource("/v1/record/{session_id}").route(web::delete().to(file::handle_delete_record)),
         );
 }
 
@@ -49,4 +50,5 @@ pub struct Container {
     pub whip_server: Arc<ingress::servers::whip::WhipServer>,
     pub whep_server: Arc<egress::servers::whep::WhepServer>,
     pub record_server: Arc<egress::servers::record::RecordServer>,
+    pub hls_server: Arc<egress::servers::hls::HlsServer>,
 }

@@ -33,7 +33,7 @@ impl RecordServer {
         log::info!("record session started: {}", &session_id);
 
         let handler = RecordHandler::new(&hub_stream, &session_id).await?;
-        let sess = Session::new(&session_id, handler);;
+        let sess = Session::new(&session_id, handler);
 
         let server = self.clone();
         self.record_sessions
@@ -41,20 +41,13 @@ impl RecordServer {
             .await
             .insert(session_id.to_string(), sess.clone());
 
+        let session_id2 = session_id.clone();
         tokio::spawn(async move {
-            let session_id = sess.session_id();
-
-            server
-                .record_sessions
-                .write()
-                .await
-                .insert(session_id.clone(), sess.clone());
-
             if let Err(err) = sess.run().await {
                 log::warn!("write file failed: {:?}", err);
             }
 
-            let _ = server.stop_session(session_id).await;
+            let _ = server.stop_session(session_id2).await;
         });
 
         Ok(session_id)

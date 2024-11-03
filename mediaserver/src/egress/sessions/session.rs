@@ -59,7 +59,6 @@ where
     }
 
     pub fn stop(self: &Arc<Self>) {
-        self.handler.stop();
         self.token.cancel();
     }
     pub async fn run(self: &Arc<Self>) -> anyhow::Result<()> {

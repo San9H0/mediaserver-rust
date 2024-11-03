@@ -30,7 +30,7 @@ impl WhepServer {
             .ok_or(anyhow::anyhow!("stream not found"))?;
 
         let session_id = Uuid::new_v4().to_string();
-        log::info!("record session started: {}", &session_id);
+        log::info!("whep session started: {}", &session_id);
         let whep_handler = WhepHandler::new(&hub_stream, &session_id).await?;
         let answer = whep_handler.init(offer).await?;
         let sess = Session::from_arc(&session_id, whep_handler.clone());

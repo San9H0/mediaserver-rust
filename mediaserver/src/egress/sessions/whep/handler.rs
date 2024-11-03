@@ -140,6 +140,7 @@ impl WhepHandler {
 
     fn on_peer_connection_state_change(self: &Arc<Self>) -> OnPeerConnectionStateChangeHdlrFn {
         let weak = Arc::downgrade(self);
+        let token = self.token.clone();
         Box::new(move |state: RTCPeerConnectionState| {
             let Some(arc) = weak.upgrade() else {
                 return Box::pin(async move {});
@@ -150,7 +151,8 @@ impl WhepHandler {
                 RTCPeerConnectionState::Disconnected
                 | RTCPeerConnectionState::Failed
                 | RTCPeerConnectionState::Closed => {
-                    arc.stop();
+                    token.cancel();
+                    arc.token.cancel();
                 }
                 _ => {}
             }
@@ -169,17 +171,6 @@ impl WhepHandler {
 
 impl SessionHandler for WhepHandler {
     type TrackContext = track_context::TrackContext;
-
-    fn session_id(&self) -> String {
-        self.session_id().clone()
-    }
-
-    fn stop(&self) {
-        self.token.cancel();
-    }
-    fn cancel_token(&self) -> CancellationToken {
-        self.token.clone()
-    }
 
     fn get_sources(&self) -> Vec<Arc<HubSource>> {
         self.sources.clone()
