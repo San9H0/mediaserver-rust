@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::BufWriter;
 use tokio::sync::Mutex;
-use crate::egress::servers::hls::{HlsPayloader, HlsService};
+use crate::egress::servers::hls::{HlsPayloader, HlsService2};
 use crate::egress::sessions::hls::output::OutputWrap;
 use crate::utils::types::types;
 
@@ -23,14 +23,13 @@ pub struct HlsHandler {
     //
     output_ctx: Arc<Mutex<OutputWrap>>,
     sources: Vec<Arc<HubSource>>,
-    target: Arc<Mutex<HlsService>>,
+    target: Arc<Mutex<HlsService2>>,
 }
 
 impl HlsHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, target: HlsService) -> anyhow::Result<Self> {
+    pub async fn new(hub_stream: &Arc<HubStream>, target: HlsService2) -> anyhow::Result<Self> {
         let file = tokio::fs::File::create("output.txt").await?;
         let mut writer = tokio::io::BufWriter::new(file);
-
 
         let mut output_ctx = OutputWrap::new()?;
 
@@ -38,7 +37,6 @@ impl HlsHandler {
         for source in hub_stream.get_sources().await {
             let codec_info = source.get_codec().await.unwrap();
             if codec_info.kind() == types::MediaKind::Audio {
-                continue;
                 let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
                     .ok_or(ffmpeg::Error::EncoderNotFound)?;
                 let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
@@ -78,10 +76,10 @@ impl SessionHandler for HlsHandler {
         dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
         output_ctx.write_header_with(dict)?;
 
-        let Ok(payloads) = output_ctx.get_buffer() else {
-            return Err(anyhow!("get_buffer failed"));
-        };
-        println!("init payloads: {}", payloads.len());
+        // let Ok(payloads) = output_ctx.get_buffer() else {
+        //     return Err(anyhow!("get_buffer failed"));
+        // };
+        // println!("init payloads: {}", payloads.len());
 
         Ok(())
     }
@@ -133,6 +131,17 @@ impl SessionHandler for HlsHandler {
         ctx: &mut Self::TrackContext,
         unit: &HubUnit,
     ) {
-        // println!("on_audio called");
+        if !self.started.load(Ordering::Acquire) {
+            return;
+        }
+
+        let Some(pkt) = ctx.make_packet(unit) else {
+            return;
+        };
+
+        let mut output_ctx = self.output_ctx.lock().await;
+        if let Err(err) = pkt.write_interleaved(&mut output_ctx) {
+            log::warn!("failed to write packet: {}", err);
+        };
     }
 }

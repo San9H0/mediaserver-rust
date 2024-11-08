@@ -23,6 +23,50 @@ pub enum HlsService {
     LowLatency(HlsState),
 }
 
+pub enum HlsServiceEnum {
+    Standard(tokio::io::BufWriter<tokio::fs::File>),
+    LowLatency,
+}
+
+pub struct HlsService2 {
+    state: HlsState,
+    service: HlsServiceEnum,
+}
+
+impl HlsService2 {
+    pub fn new(state: HlsState, service: HlsServiceEnum) -> Self {
+        Self {
+            state,
+            service,
+        }
+    }
+
+    pub async fn write_segment<T: HlsPayloader>(&mut self, payloader: Arc<Mutex<T>>) -> anyhow::Result<()> {
+        if self.state.started {
+            self.state.prev_time = tokio::time::Instant::now();
+            self.state.started = true;
+            return Ok(());
+        }
+        if self.state.prev_time.elapsed() > tokio::time::Duration::from_secs(10) {
+            self.state.prev_time = tokio::time::Instant::now();
+
+            let payload = {
+                let mut p = payloader.lock().await;
+                p.get_payload()?
+            };
+
+            tokio::fs::File::create("test.mp4")
+                .await?
+                .write_all(&payload)
+                .await?;
+
+            println!("write.. payload: {}", payload.len());
+        }
+        Ok(())
+    }
+}
+
+
 impl HlsService {
     pub async fn write_segment<T: HlsPayloader>(&mut self, payloader: Arc<Mutex<T>>) -> anyhow::Result<()> {
         match self {
@@ -35,13 +79,18 @@ impl HlsService {
                     state.started = true;
                     return Ok(());
                 }
-                if state.prev_time.elapsed() > tokio::time::Duration::from_secs(1) {
+                if state.prev_time.elapsed() > tokio::time::Duration::from_secs(10) {
                     state.prev_time = tokio::time::Instant::now();
 
                     let payload = {
                         let mut p = payloader.lock().await;
                         p.get_payload()?
                     };
+
+                    tokio::fs::File::create("test.mp4")
+                        .await?
+                        .write_all(&payload)
+                        .await?;
 
                     println!("write.. payload: {}", payload.len());
                 }
@@ -77,22 +126,23 @@ impl HlsServer {
         log::info!("hls session started: {}", &session_id);
 
         let use_file = false;
-        let mut output: HlsService = if use_file {
+
+        let mut service2: HlsService2 = if use_file {
             let file = tokio::fs::File::create("output.txt").await?;
-            HlsService::Standard(HlsState{
+            HlsService2::new(HlsState{
                 started: false,
                 count: 0,
                 prev_time: tokio::time::Instant::now(),
-            }, tokio::io::BufWriter::new(file))
+            }, HlsServiceEnum::Standard(tokio::io::BufWriter::new(file)))
         } else {
-            HlsService::LowLatency(HlsState{
+            HlsService2::new(HlsState{
                 started: false,
                 count: 0,
                 prev_time: tokio::time::Instant::now(),
-            })
+            }, HlsServiceEnum::LowLatency)
         };
 
-        let handler = HlsHandler::new(&hub_stream, output).await?;
+        let handler = HlsHandler::new(&hub_stream, service2).await?;
         let sess = Session::new(&session_id, handler);
 
         let server = self.clone();
