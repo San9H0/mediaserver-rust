@@ -50,20 +50,20 @@ impl PPS {
         let mut pic_size_in_map_units_minus1 = 0;
         let mut slice_group_id = Vec::<u8>::new();
 
-        if (num_slice_groups_minus1 > 0) {
+        if num_slice_groups_minus1 > 0 {
             slice_group_map_type = nalu.reader.read_ue()?;
-            if (slice_group_map_type == 0) {
+            if slice_group_map_type == 0 {
                 for i in 0..num_slice_groups_minus1 {
                     num_length_minus1.push(nalu.reader.read_ue()?);
                 }
-            } else if (slice_group_map_type == 2) {
+            } else if slice_group_map_type == 2 {
                 for i in 0..num_slice_groups_minus1 {
                     top_left.push(nalu.reader.read_ue()?);
                     bottom_right.push(nalu.reader.read_ue()?);
                 }
-            } else if (slice_group_map_type == 3
+            } else if slice_group_map_type == 3
                 || slice_group_map_type == 4
-                || slice_group_map_type == 5)
+                || slice_group_map_type == 5
             {
                 slice_group_change_direction_flag = nalu.reader.read_bits(1)?;
                 slice_group_change_rate_minus1 = nalu.reader.read_ue()?;

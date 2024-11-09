@@ -44,7 +44,8 @@ impl HubSource {
         self: &Arc<Self>,
         transcoding_codec: &Codec,
     ) -> anyhow::Result<Arc<HubTrack>> {
-        let source_codec = self.get_codec().await.ok_or(anyhow::anyhow!("no codec"))?;
+        // 출력 코덱이 다를경우 transcoding을 고려해주어야 한다. _source_codec 은 그부분을 체크하기 위한 부분임.
+        let _source_codec = self.get_codec().await.ok_or(anyhow::anyhow!("no codec"))?;
         let hub_track = {
             let mut tracks = self.tracks.write().await;
             tracks

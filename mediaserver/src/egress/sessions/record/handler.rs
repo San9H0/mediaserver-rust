@@ -1,6 +1,4 @@
-use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
-use crate::codecs::h264::format::NALUType;
 use crate::egress::sessions::record::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::hubs::source::HubSource;
@@ -10,14 +8,9 @@ use crate::utils::files::directory::create_directory_if_not_exists;
 use crate::utils::types::types;
 use ffmpeg_next as ffmpeg;
 use ffmpeg_next::format::context;
-use ffmpeg_next::Rescale;
-use ffmpeg_sys_next::sprintf;
-use std::cmp::PartialEq;
-use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio_util::sync::CancellationToken;
 
 pub struct RecordHandler {
     started: AtomicBool,

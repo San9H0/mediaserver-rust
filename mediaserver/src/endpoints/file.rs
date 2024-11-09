@@ -3,15 +3,6 @@ use actix_web::{web, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::Serialize;
 
-#[derive(Clone)]
-pub struct FileRecordHandler {}
-
-impl FileRecordHandler {
-    pub fn new() -> Self {
-        FileRecordHandler {}
-    }
-}
-
 #[derive(Serialize)]
 struct CreateRecordResponse {
     session_id: String,

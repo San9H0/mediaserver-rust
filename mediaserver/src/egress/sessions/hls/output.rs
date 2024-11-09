@@ -1,12 +1,10 @@
 use std::ffi::CString;
-use std::io::Write;
 use std::ptr;
 use anyhow::anyhow;
 use ffmpeg_next as ffmpeg;
 use ffmpeg_next::format::context;
 use std::ops::{Deref, DerefMut};
 use std::mem::ManuallyDrop;
-use ffmpeg_next::format::context::Output;
 use crate::egress::sessions::hls::hls_data;
 use crate::egress::servers::hls::HlsPayloader;
 

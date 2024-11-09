@@ -1,5 +1,5 @@
 use crate::codecs::codec::Codec;
-use crate::codecs::codec::Codec::{Opus, H264};
+use crate::codecs::codec::Codec::Opus;
 use crate::codecs::opus::codec::OpusCodec;
 use crate::hubs::unit::FrameInfo;
 use bytes::Bytes;

@@ -4,16 +4,13 @@ use crate::codecs::h264::codec::H264Codec;
 use crate::codecs::h264::config::Config;
 use crate::codecs::h264::format::NALUType;
 use crate::hubs::unit::FrameInfo;
-use anyhow::{anyhow, Error};
 use bitstreams::h264::nal_unit::NalUnit;
 use bitstreams::h264::pps::PPS;
 use bitstreams::h264::sps::SPS;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use std::future::Future;
-use std::io::Cursor;
 use std::pin::Pin;
-use std::rc::Rc;
 
 pub struct MyParser {
     pub on_codec: Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()>>> + Send>,

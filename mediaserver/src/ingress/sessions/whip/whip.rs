@@ -1,23 +1,11 @@
-use crate::codecs;
 use crate::codecs::codec::Codec;
-use crate::codecs::codec::Codec::Opus;
-use crate::codecs::h264::rtp_parser::MyParser;
-use crate::codecs::opus::codec::OpusCodec;
 use crate::codecs::rtp_parser::RtpParser;
-use crate::egress::sessions::record::handler::RecordHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
 use crate::ingress::sessions::whip::stats::Stats;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use anyhow::anyhow;
-use bytes::{Bytes, BytesMut};
-use ffmpeg_next as ffmpeg;
-use ffmpeg_next::Rescale;
-use futures::lock::Mutex;
-use std::cell::RefCell;
-use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -33,8 +21,6 @@ use webrtc::peer_connection::{
 };
 use webrtc::rtcp::payload_feedbacks::picture_loss_indication::PictureLossIndication;
 use webrtc::rtcp::payload_feedbacks::receiver_estimated_maximum_bitrate::ReceiverEstimatedMaximumBitrate;
-use webrtc::rtcp::receiver_report::ReceiverReport;
-use webrtc::rtcp::reception_report::ReceptionReport;
 use webrtc::rtp_transceiver::rtp_codec::{
     RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType,
 };
@@ -182,9 +168,9 @@ impl WhipSession {
                 }
                 self_.send_rtcp(&remote, &stats);
                 if remote.kind() == RTPCodecType::Audio {
-                    self_.read_rtp_audio(&remote, &receiver, &stats);
+                    self_.read_rtp_audio(&remote, &stats);
                 } else {
-                    self_.read_rtp_video(&remote, &receiver, &stats);
+                    self_.read_rtp_video(&remote, &stats);
                 }
                 Box::pin(async move {})
             },
@@ -239,7 +225,6 @@ impl WhipSession {
     fn read_rtp_audio(
         self: &Arc<Self>,
         remote: &Arc<TrackRemote>,
-        receiver: &Arc<RTCRtpReceiver>,
         stats: &Arc<Stats>,
     ) {
         let self_ = self.clone();
@@ -320,7 +305,6 @@ impl WhipSession {
     fn read_rtp_video(
         self: &Arc<Self>,
         remote: &Arc<TrackRemote>,
-        receiver: &Arc<RTCRtpReceiver>,
         stats: &Arc<Stats>,
     ) {
         let self_ = self.clone();

@@ -1,5 +1,3 @@
-use webrtc::rtp::packet::Packet;
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HubUnit {
     pub payload: bytes::Bytes,

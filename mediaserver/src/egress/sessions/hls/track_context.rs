@@ -3,7 +3,6 @@ use crate::codecs::codec::Codec;
 use crate::hubs::unit::HubUnit;
 use ffmpeg_next as ffmpeg;
 use ffmpeg_next::Rescale;
-use crate::codecs::h264::format::NALUType;
 
 pub struct TrackContext {
     codec: Codec,

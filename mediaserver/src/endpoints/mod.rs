@@ -1,5 +1,4 @@
 use crate::hubs::hub::Hub;
-use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use crate::{egress, ingress};
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};

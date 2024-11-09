@@ -4,11 +4,10 @@ mod endpoints;
 mod hubs;
 mod ingress;
 mod webrtc_wrapper;
-
+mod protocols;
 mod utils;
 
 use crate::hubs::hub::Hub;
-use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use config::{Config, File, FileFormat};
 use std::sync::Arc;
 

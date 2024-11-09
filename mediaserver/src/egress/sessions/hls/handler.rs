@@ -1,17 +1,14 @@
-use std::ptr;
 use crate::codecs::codec::Codec;
 use crate::egress::sessions::hls::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
-use anyhow::anyhow;
 use ffmpeg_next as ffmpeg;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::io::BufWriter;
 use tokio::sync::Mutex;
-use crate::egress::servers::hls::{HlsPayloader, HlsService2};
+use crate::egress::servers::hls::HlsService;
 use crate::egress::sessions::hls::output::OutputWrap;
 use crate::utils::types::types;
 
@@ -23,11 +20,11 @@ pub struct HlsHandler {
     //
     output_ctx: Arc<Mutex<OutputWrap>>,
     sources: Vec<Arc<HubSource>>,
-    target: Arc<Mutex<HlsService2>>,
+    target: Arc<Mutex<HlsService>>,
 }
 
 impl HlsHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, target: HlsService2) -> anyhow::Result<Self> {
+    pub async fn new(hub_stream: &Arc<HubStream>, target: HlsService) -> anyhow::Result<Self> {
         let file = tokio::fs::File::create("output.txt").await?;
         let mut writer = tokio::io::BufWriter::new(file);
 
@@ -75,11 +72,6 @@ impl SessionHandler for HlsHandler {
         let mut dict = ffmpeg::Dictionary::new();
         dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
         output_ctx.write_header_with(dict)?;
-
-        // let Ok(payloads) = output_ctx.get_buffer() else {
-        //     return Err(anyhow!("get_buffer failed"));
-        // };
-        // println!("init payloads: {}", payloads.len());
 
         Ok(())
     }

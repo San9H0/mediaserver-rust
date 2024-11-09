@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 bitstreams = { path = "../bitstreams", package = "bitstreams" }
+m3u8-rs = { path = "../m3u8-rs" }
 
 actix-web = "4.9.0"
 actix-web-httpauth = "0.8.2"

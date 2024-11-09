@@ -1,4 +1,3 @@
-use crate::codecs;
 use crate::codecs::rtp_packetizer::RtpPacketizer;
 use crate::codecs::rtp_payloader::RtpPayloader;
 use crate::egress::sessions::whep::local_track::LocalTrack;

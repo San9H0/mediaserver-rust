@@ -1,4 +1,3 @@
-use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
 use crate::hubs::source::HubSource;
 use crate::hubs::unit::HubUnit;
@@ -73,7 +72,6 @@ where
             let self_ = self.clone();
 
             let mut ctx = self_.handler.on_track_context(idx, &codec);
-            let handler_ = self_.handler.clone();
 
             let handle = tokio::spawn(async move {
                 loop {
