@@ -2,6 +2,7 @@ use crate::h264::nal_unit::NalUnit;
 use bytes::Bytes;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PPS {
     pub payload: Bytes,
     pic_parameter_set_id: u8,
@@ -53,11 +54,11 @@ impl PPS {
         if num_slice_groups_minus1 > 0 {
             slice_group_map_type = nalu.reader.read_ue()?;
             if slice_group_map_type == 0 {
-                for i in 0..num_slice_groups_minus1 {
+                for _ in 0..num_slice_groups_minus1 {
                     num_length_minus1.push(nalu.reader.read_ue()?);
                 }
             } else if slice_group_map_type == 2 {
-                for i in 0..num_slice_groups_minus1 {
+                for _ in 0..num_slice_groups_minus1 {
                     top_left.push(nalu.reader.read_ue()?);
                     bottom_right.push(nalu.reader.read_ue()?);
                 }
@@ -69,7 +70,7 @@ impl PPS {
                 slice_group_change_rate_minus1 = nalu.reader.read_ue()?;
             } else if slice_group_map_type == 6 {
                 pic_size_in_map_units_minus1 = nalu.reader.read_ue()?;
-                for i in 0..pic_size_in_map_units_minus1 {
+                for _ in 0..pic_size_in_map_units_minus1 {
                     slice_group_id.push(nalu.reader.read_bits(1)?);
                 }
             }

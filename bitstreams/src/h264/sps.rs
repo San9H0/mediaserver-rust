@@ -1,4 +1,3 @@
-use crate::h264::errors::H264Error;
 use crate::h264::nal_unit::NalUnit;
 use bytes::Bytes;
 
@@ -39,7 +38,7 @@ impl SPS {
             anyhow::bail!("Invalid NAL unit type for SPS: {}", nalu.nal_unit_type);
         }
 
-        let mut reader = &mut nalu.reader;
+        let reader = &mut nalu.reader;
         let profile_idc = reader.read_bits(8)?;
         let constraint_compantion_flag = reader.read_bits(8)?;
         let level_idc = reader.read_bits(8)?;

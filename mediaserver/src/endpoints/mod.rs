@@ -6,17 +6,9 @@ use std::sync::Arc;
 
 pub mod error;
 mod file;
+mod hls;
 pub mod whep;
 pub mod whip;
-mod hls;
-
-pub async fn myf(failed: bool) -> error::Result<impl Responder> {
-    if failed {
-        // return anyhow::anyhow!("failed");
-        return Err(error::Error::from(anyhow::anyhow!("failed")));
-    }
-    Ok(HttpResponse::Ok())
-}
 
 pub async fn build(hub: Arc<Hub>) -> std::io::Result<()> {
     HttpServer::new(move || {
@@ -40,8 +32,27 @@ fn routes(app: &mut web::ServiceConfig) {
     app.service(web::resource("/v1/whip").route(web::post().to(whip::handle_whip)))
         .service(web::resource("/v1/whep").route(web::post().to(whep::handle_whep)))
         .service(web::resource("/v1/record").route(web::post().to(file::handle_create_record)))
-        .service(web::resource("/v1/hls").route(web::post().to(hls::handle_create_hls)))
-        .service(web::resource("/v1/record/{session_id}").route(web::delete().to(file::handle_delete_record)),
+        .service(web::resource("/v1/hls").route(web::post().to(hls::handle_create_session)))
+        .service(
+            web::resource("/v1/record/{session_id}")
+                .route(web::delete().to(file::handle_delete_record)),
+        )
+        .service(
+            web::resource("/v1/hls/{session_id}")
+                .route(web::delete().to(hls::handle_delete_session))
+                .route(web::get().to(hls::handle_get_session)),
+        )
+        .service(
+            web::resource("/v1/hls/{session_id}/{hls}")
+            .route(web::get().to(|handler: web::Data<Container>, path, query|  {
+                hls::handle_get_hls(handler, "hls", path, query)
+            })),
+        )
+        .service(
+            web::resource("/v1/llhls/{session_id}/{hls}")
+            .route(web::get().to(|handler: web::Data<Container>, path, query|  {
+                hls::handle_get_hls(handler, "llhls", path, query)
+            })),
         );
 }
 

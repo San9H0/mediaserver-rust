@@ -1,35 +1,52 @@
 use crate::codecs::codec::Codec;
+use crate::egress::servers::hls::HlsService;
+use crate::egress::sessions::hls::output::OutputWrap;
 use crate::egress::sessions::hls::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
-use ffmpeg_next as ffmpeg;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::Mutex;
-use crate::egress::servers::hls::HlsService;
-use crate::egress::sessions::hls::output::OutputWrap;
 use crate::utils::types::types;
+use bitstreams::h264::nal_unit::NalUnit;
+use ffmpeg_next as ffmpeg;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
+
+struct HlsState {
+    index: i32,
+    started: bool,
+    prev_pts: u32,
+    duration_sum: i64,
+    count: i32,
+    prev_time: tokio::time::Instant,
+}
+
+impl HlsState {
+    fn new() -> Self {
+        Self {
+            started: false,
+            index: 0,
+            count: 0,
+            prev_time: tokio::time::Instant::now(),
+            prev_pts: 0,
+            duration_sum: 0,
+        }
+    }
+}
 
 pub struct HlsHandler {
     started: AtomicBool,
-    // session_id: String,
-    // started: AtomicBool,
-    // token: CancellationToken,
-    //
-    output_ctx: Arc<Mutex<OutputWrap>>,
+    state: RwLock<HlsState>,
+
+    output_ctx: Mutex<OutputWrap>,
     sources: Vec<Arc<HubSource>>,
-    target: Arc<Mutex<HlsService>>,
+    target: Arc<HlsService>,
 }
 
 impl HlsHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, target: HlsService) -> anyhow::Result<Self> {
-        let file = tokio::fs::File::create("output.txt").await?;
-        let mut writer = tokio::io::BufWriter::new(file);
-
+    pub async fn new(hub_stream: &Arc<HubStream>, target: Arc<HlsService>) -> anyhow::Result<Self> {
         let mut output_ctx = OutputWrap::new()?;
-
         let mut sources = vec![];
         for source in hub_stream.get_sources().await {
             let codec_info = source.get_codec().await.unwrap();
@@ -48,17 +65,23 @@ impl HlsHandler {
                 let mut video = encoder_ctx.encoder().video()?;
                 let _ = codec_info.set_av_video(&mut video)?;
                 let encoder = video.open_as(codec)?;
+                println!(
+                    "encoder.time_base(): {}, {}",
+                    encoder.time_base().0,
+                    encoder.time_base().1
+                );
+
                 output_ctx.add_stream_with(&encoder)?;
             }
             sources.push(source);
         }
 
         Ok(HlsHandler {
+            state: RwLock::new(HlsState::new()),
             started: AtomicBool::new(false),
-            // token,
-            output_ctx: Arc::new(Mutex::new(output_ctx)),
+            output_ctx: Mutex::new(output_ctx),
             sources,
-            target: Arc::new(Mutex::new(target)),
+            target,
         })
     }
 }
@@ -67,11 +90,20 @@ impl SessionHandler for HlsHandler {
     type TrackContext = track_context::TrackContext;
 
     async fn on_initialize(&self) -> anyhow::Result<()> {
-        let mut output_ctx = self.output_ctx.lock().await;
+        {
+            let mut output_ctx = self.output_ctx.lock().await;
+            let mut dict = ffmpeg::Dictionary::new();
+            dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
+            output_ctx.write_header_with(dict)?;
+        }
 
-        let mut dict = ffmpeg::Dictionary::new();
-        dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
-        output_ctx.write_header_with(dict)?;
+        let payload = {
+            let mut p = self.output_ctx.lock().await;
+            let b = p.get_payload()?;
+            b
+        };
+
+        self.target.init_segment(payload).await?;
 
         Ok(())
     }
@@ -89,11 +121,7 @@ impl SessionHandler for HlsHandler {
         track_context::TrackContext::new(idx, codec)
     }
 
-    async fn on_video(
-        &self,
-        ctx: &mut Self::TrackContext,
-        unit: &HubUnit,
-    ) {
+    async fn on_video(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) {
         if !self.started.load(Ordering::Acquire) {
             if unit.frame_info.flag != 1 {
                 return;
@@ -105,24 +133,67 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
+        let duration = pkt.duration();
+        let time_base = pkt.time_base();
+        let pkt2 = pkt.clone();
         if let Err(err) = {
-            let mut hls_service = self.target.lock().await;
-            hls_service.write_segment(self.output_ctx.clone()).await
+            let mut output_ctx = self.output_ctx.lock().await;
+            pkt.write_interleaved(&mut output_ctx)
         } {
+            log::warn!("failed to write packet: {}", err);
+        };
+
+        log::info!("[TESTDEBUG] video unit.pts:{}, pkt2.pts:{:?}", unit.pts, pkt2.pts());
+        let (index, duration) = {
+            let mut state = self.state.write().await;
+            if state.duration_sum == 0 {
+                log::info!("first packet? pts: {:?}, dts:{:?}, data[0]:{:02x}, data[1]:{:02x}, data[2]:{:02x}, data[3]:{:02x}, data[4]:{:02x}", 
+                pkt2.pts(), pkt2.dts(), unit.payload[0], unit.payload[1], unit.payload[2], unit.payload[3], unit.payload[4]);
+            }
+            state.duration_sum += duration;
+
+            if !state.started {
+                state.started = true;
+                state.prev_time = tokio::time::Instant::now();
+                return;
+            } else if state.prev_time.elapsed() < tokio::time::Duration::from_secs(1) {
+                return;
+            } 
+            let duration = state.duration_sum as f32 / time_base.1 as f32;
+            if duration < 1.0 {
+                return;
+            }
+            state.prev_time = tokio::time::Instant::now();
+
+        
+            log::info!("last packet duration:{}, pts: {:?}, dts:{:?}, data[0]:{:02x}, data[1]:{:02x}, data[2]:{:02x}, data[3]:{:02x}, data[4]:{:02x}", 
+                duration, pkt2.pts(), pkt2.dts(), unit.payload[0], unit.payload[1], unit.payload[2], unit.payload[3], unit.payload[4]);
+            
+            state.duration_sum = 0;
+            let index = state.index;
+            state.index += 1;
+            state.prev_pts = unit.pts;
+
+            (index, duration)
+        };
+
+        let payload = {
+            let mut p = self.output_ctx.lock().await;
+            let Ok(b) = p.get_payload() else {
+                log::warn!("failed to get payload");
+                return;
+            };
+            b
+        };
+
+
+        if let Err(err) = self.target.write_segment(index, duration, payload).await {
             log::warn!("failed to write segment: {}", err);
         }
 
-        let mut output_ctx = self.output_ctx.lock().await;
-        if let Err(err) = pkt.write_interleaved(&mut output_ctx) {
-            log::warn!("failed to write packet: {}", err);
-        };
     }
 
-    async fn on_audio(
-        &self,
-        ctx: &mut Self::TrackContext,
-        unit: &HubUnit,
-    ) {
+    async fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) {
         if !self.started.load(Ordering::Acquire) {
             return;
         }
@@ -131,9 +202,16 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
-        let mut output_ctx = self.output_ctx.lock().await;
-        if let Err(err) = pkt.write_interleaved(&mut output_ctx) {
+        
+        let pkt2 = pkt.clone();
+        if let Err(err) = {
+            let mut output_ctx = self.output_ctx.lock().await;
+            pkt.write_interleaved(&mut output_ctx)
+        } {
             log::warn!("failed to write packet: {}", err);
         };
+
+        let mut state = self.state.write().await;
+        log::info!("[TESTDEBUG] audio unit.pts:{}, pkt2.pts:{:?}", unit.pts, pkt2.pts());
     }
 }

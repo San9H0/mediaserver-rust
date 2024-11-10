@@ -33,3 +33,6 @@ ffmpeg-sys-next = "7.1.0"
 scopeguard = "1.2.0"
 serde = { version = "1.0.210", features = ["derive"] }
 libc = "0.2.159"
+runtime = "0.0.0"
+actix-files = "0.6.6"
+flexi_logger = "0.29.6"

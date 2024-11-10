@@ -100,7 +100,7 @@ impl Stats {
     }
 
     pub async fn calc_rtp_stats(self: &Arc<Self>, packet: &rtp::packet::Packet) {
-        let mut now = chrono::Local::now();
+        let now = chrono::Local::now();
         let diff_milli = now.sub(self.start_time).num_milliseconds() as u32;
 
         let mut read_stat = self.read_stat.write().await;
@@ -108,15 +108,10 @@ impl Stats {
     }
 
     pub async fn make_receiver_report(self: &Arc<Self>, ssrc: u32) -> ReceiverReport {
-        let mut jitter = 0.0;
-        let mut max_seq_no = 0;
-        let mut packet_expect = 0;
-        let mut packet_lost = 0;
-        {
+        let (jitter, max_seq_no, packet_expect, packet_lost) = {
             let read_stats = self.read_stat.read().await;
-            (jitter, max_seq_no, packet_expect, packet_lost) =
-                read_stats.get_receiver_report_params().await;
-        }
+            read_stats.get_receiver_report_params().await
+        };
 
         let expected_interval = packet_expect - self.prev_expected.load(Ordering::Acquire);
         let lost_interval = packet_lost - self.prev_packet_lost.load(Ordering::Acquire);

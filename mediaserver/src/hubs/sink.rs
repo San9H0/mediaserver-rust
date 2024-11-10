@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::RwLock;
-use tokio_util::sync::CancellationToken;
 
 pub struct HubSink {
     rx: RwLock<Receiver<HubUnit>>,

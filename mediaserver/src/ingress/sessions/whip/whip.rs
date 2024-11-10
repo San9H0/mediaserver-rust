@@ -34,10 +34,10 @@ pub struct WhipSession {
 }
 
 impl WhipSession {
-    pub async fn new() -> Arc<Self> {
+    pub async fn new() -> anyhow::Result<Arc<Self>> {
         // let api = WebRtcApi::new();
         let mut media_engine = MediaEngine::default();
-        let result = media_engine.register_codec(
+        media_engine.register_codec(
             RTCRtpCodecParameters {
                 capability: RTCRtpCodecCapability {
                     mime_type: MIME_TYPE_H264.to_string(),
@@ -52,8 +52,8 @@ impl WhipSession {
                 stats_id: "".to_string(),
             },
             RTPCodecType::Video,
-        );
-        let result = media_engine.register_codec(
+        )?;
+        media_engine.register_codec(
             RTCRtpCodecParameters {
                 capability: RTCRtpCodecCapability {
                     mime_type: MIME_TYPE_OPUS.to_string(),
@@ -66,16 +66,16 @@ impl WhipSession {
                 stats_id: "".to_string(),
             },
             RTPCodecType::Audio,
-        );
+        )?;
 
         let api = WebRtcApi::new_with_media_engine(media_engine);
         let pc = api.new_peer_connection().await;
         let token = CancellationToken::new();
-        Arc::new(WhipSession {
+        Ok(Arc::new(WhipSession {
             pc,
             hub_stream: HubStream::new(),
             token,
-        })
+        }))
     }
 
     pub fn hub_stream(&self) -> Arc<HubStream> {
@@ -156,7 +156,7 @@ impl WhipSession {
     fn on_track(self: &Arc<Self>) -> OnTrackHdlrFn {
         let weak = Arc::downgrade(self);
         Box::new(
-            move |remote: Arc<TrackRemote>, receiver: Arc<RTCRtpReceiver>, _| {
+            move |remote: Arc<TrackRemote>, _receiver: Arc<RTCRtpReceiver>, _| {
                 let Some(arc) = weak.upgrade() else {
                     return Box::pin(async move {});
                 };
@@ -222,14 +222,10 @@ impl WhipSession {
             }
         });
     }
-    fn read_rtp_audio(
-        self: &Arc<Self>,
-        remote: &Arc<TrackRemote>,
-        stats: &Arc<Stats>,
-    ) {
+    fn read_rtp_audio(self: &Arc<Self>, remote: &Arc<TrackRemote>, stats: &Arc<Stats>) {
         let self_ = self.clone();
         let remote_ = remote.clone();
-        let mut stats_ = stats.clone();
+        let stats_ = stats.clone();
         tokio::spawn(async move {
             let source = HubSource::new();
             self_.hub_stream.add_source(source.clone()).await;
@@ -250,7 +246,7 @@ impl WhipSession {
             let mut start_ts = 0;
             let mut last_ts = 0;
             let mut duration = 0;
-            let mut timebase = remote_.codec().capability.clock_rate;
+            let timebase = remote_.codec().capability.clock_rate;
             loop {
                 tokio::select! {
                     _ = self_.token.cancelled() => {
@@ -302,11 +298,7 @@ impl WhipSession {
         });
     }
 
-    fn read_rtp_video(
-        self: &Arc<Self>,
-        remote: &Arc<TrackRemote>,
-        stats: &Arc<Stats>,
-    ) {
+    fn read_rtp_video(self: &Arc<Self>, remote: &Arc<TrackRemote>, stats: &Arc<Stats>) {
         let self_ = self.clone();
         let remote_ = remote.clone();
         let stats_ = stats.clone();

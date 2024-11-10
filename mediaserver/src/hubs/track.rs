@@ -20,6 +20,7 @@ impl HubTrack {
         hub_track
     }
 
+    #[allow(dead_code)]
     pub fn stop(self: &Arc<Self>) {}
 
     pub async fn run(self: &Arc<Self>, mut rx: Receiver<HubUnit>, token: CancellationToken) {
@@ -37,7 +38,7 @@ impl HubTrack {
                     if self.tx.receiver_count() == 0 {
                         continue;
                     }
-                    if let Err(e) = self.tx.send(hub_unit) {
+                    if let Err(_) = self.tx.send(hub_unit) {
                         continue;
                     }
                 }

@@ -1,10 +1,9 @@
 use crate::egress::sessions::record::handler::RecordHandler;
-use crate::egress::sessions::session::{Session, SessionHandler};
+use crate::egress::sessions::session::Session;
 use crate::hubs::hub::Hub;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::time;
 use uuid::Uuid;
 
 pub struct RecordServer {

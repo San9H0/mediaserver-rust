@@ -27,7 +27,7 @@ impl TrackContext {
             dts: 0,
         }
     }
-    pub fn make_packet (&mut self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
+    pub fn make_packet(&mut self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
         if !self.started {
             self.started = true;
             self.base_ts = unit.pts;
@@ -54,6 +54,7 @@ impl TrackContext {
         pkt.set_dts(Some(
             (self.dts as i64).rescale(input_time_base, output_time_base),
         ));
+        pkt.set_time_base(output_time_base);
         pkt.set_duration((unit.duration as i64).rescale_with(
             input_time_base,
             output_time_base,

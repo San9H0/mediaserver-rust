@@ -1,6 +1,4 @@
 use crate::readers::errors::BitReaderError;
-use std::ops::{BitOr, Shl};
-use std::process::Output;
 
 pub struct BitReader<'a> {
     data: &'a [u8],

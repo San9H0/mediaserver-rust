@@ -113,7 +113,6 @@ impl WhepSession {
         Ok(answer_sdp.sdp)
     }
     async fn read_source(self: &Arc<Self>) -> anyhow::Result<()> {
-        let (tx, mut rx) = mpsc::channel::<()>(100);
         for source in self.hub_stream.get_sources().await {
             let codec = source.get_codec().await.unwrap();
             let kind = codec.kind();
@@ -130,7 +129,7 @@ impl WhepSession {
                 loop {
                     tokio::select! {
                         result = sink.read_unit() => {
-                            let Ok(mut unit) = result else {
+                            let Ok(unit) = result else {
                                 break;
                             };
 

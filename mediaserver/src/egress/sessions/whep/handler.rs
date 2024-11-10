@@ -10,7 +10,7 @@ use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use anyhow::anyhow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tokio::time;
 use tokio_util::sync::CancellationToken;
 use webrtc::api::media_engine::MediaEngine;
@@ -36,7 +36,7 @@ pub struct WhepHandler {
 }
 
 impl WhepHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, session_id: &str) -> anyhow::Result<Arc<Self>> {
+    pub async fn new(hub_stream: &Arc<HubStream>, _: &str) -> anyhow::Result<Arc<Self>> {
         let token = CancellationToken::new();
         let local_track = LocalTrack::new();
         let mut sources = vec![];
@@ -182,7 +182,7 @@ impl SessionHandler for WhepHandler {
         let Ok(packets) = ctx.make_packet(unit) else {
             return;
         };
-        let mut local_track = self.local_track.get_local_track(types::MediaKind::Video);
+        let local_track = self.local_track.get_local_track(types::MediaKind::Video);
         for packet in packets.iter() {
             if let Err(err) = local_track.write_rtp(packet).await {
                 log::warn!("write rtp failed: {:?}", err);
@@ -198,7 +198,7 @@ impl SessionHandler for WhepHandler {
         let Ok(packets) = ctx.make_packet(unit) else {
             return;
         };
-        let mut local_track = self.local_track.get_local_track(types::MediaKind::Audio);
+        let local_track = self.local_track.get_local_track(types::MediaKind::Audio);
         for packet in packets.iter() {
             // println!("write audio rtp sn:{}, ts:{}", packet.header.sequence_number, packet.header.timestamp);
             if let Err(err) = local_track.write_rtp(packet).await {

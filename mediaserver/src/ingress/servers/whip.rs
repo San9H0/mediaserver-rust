@@ -15,7 +15,7 @@ impl WhipServer {
         stream_id: String,
         offer: &str,
     ) -> anyhow::Result<String> {
-        let whip_session = WhipSession::new().await;
+        let whip_session = WhipSession::new().await?;
         let answer = whip_session.init(offer).await?;
 
         let server = self.clone();

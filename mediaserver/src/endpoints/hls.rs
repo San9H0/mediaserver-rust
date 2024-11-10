@@ -1,29 +1,26 @@
-use crate::endpoints::Container;
+use std::path::Path;
+
+use crate::{egress::servers::hls::HlsPath, endpoints::Container};
+use actix_files::NamedFile;
 use actix_web::{web, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
-use serde::Serialize;
-
-#[derive(Clone)]
-pub struct HlsHandler {}
-
-impl HlsHandler {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct HlsResponse {
     session_id: String,
 }
 
-pub async fn handle_create_hls(
+pub async fn handle_create_session(
     handler: web::Data<Container>,
     auth: BearerAuth,
 ) -> impl Responder {
     let token = auth.token().to_owned();
 
-    log::info!("hls_server file body streamID:{}, messageType:request", token,);
+    log::info!(
+        "hls_server file body streamID:{}, messageType:request",
+        token,
+    );
 
     let session_id = match handler.hls_server.start_session(&token).await {
         Ok(session_id) => session_id,
@@ -40,7 +37,18 @@ pub async fn handle_create_hls(
     HttpResponse::Ok().json(response)
 }
 
-pub async fn handle_delete_hls(
+pub async fn handle_get_session(
+    _handler: web::Data<Container>,
+    session_id_: web::Path<String>,
+) -> impl Responder {
+    let session_id = session_id_.to_string();
+
+    log::info!("get hls body streamID:{}, messageType:request", session_id,);
+
+    HttpResponse::Ok().finish()
+}
+
+pub async fn handle_delete_session(
     handler: web::Data<Container>,
     session_id_: web::Path<String>,
 ) -> impl Responder {
@@ -51,11 +59,7 @@ pub async fn handle_delete_hls(
         session_id,
     );
 
-    let _result = match handler
-        .hls_server
-        .stop_session(session_id.to_owned())
-        .await
-    {
+    let _result = match handler.hls_server.stop_session(session_id.to_owned()).await {
         Ok(_result) => _result,
         Err(e) => {
             log::error!("delete hls error:{}", e);
@@ -65,3 +69,70 @@ pub async fn handle_delete_hls(
 
     HttpResponse::Ok().finish()
 }
+
+#[derive(Deserialize)]
+pub struct HlsQuery {
+    #[serde(rename = "_HLS_msn")]
+    pub _hls_msn: Option<u32>,
+    #[serde(rename = "_HLS_part")]
+    pub _hls_part: Option<u32>,
+}
+
+
+pub async fn handle_get_hls(
+    handler: web::Data<Container>,
+    service_type: &'static str, 
+    path: web::Path<(String, String)>,
+    query: web::Query<HlsQuery>,
+) -> actix_web::Result<NamedFile> {
+    let is_llhls = service_type == "llhls";
+    let (session_id, path) = path.into_inner();
+    let query = query.into_inner();
+    
+    let msn = query._hls_msn;
+    let part = query._hls_part;
+
+    let is_master = path == "index.m3u8";
+    let is_playlist = path == "video.m3u8";
+    let is_video = path.ends_with(".mp4") || path.ends_with(".m4s");
+    if !is_video && !is_master && !is_playlist {
+        return Err(actix_web::error::ErrorBadRequest("Bad request"));
+    }
+
+    let _session = match handler.hls_server.get_session(&session_id).await {
+        Ok(session) => session,
+        Err(err) => {
+            log::error!("get hls error:{}", err);
+            return Err(actix_web::error::ErrorNotFound("Session not found"));
+        }
+    };
+
+    if let (Some(msn), Some(part)) = (query._hls_msn, query._hls_part) {
+        // 두 값이 모두 있는 경우 처리
+        let mut rx = _session.service.subscribe_signal();
+        if rx.changed().await.is_ok() {
+            let (recv_msn, recv_part) = *rx.borrow();
+        }
+    } 
+
+    
+    let hls_path = HlsPath::new(session_id.to_string());
+    let filepath = if is_master {
+        hls_path.make_master_path(is_llhls)
+    } else if is_playlist {
+        hls_path.make_playlist_path(is_llhls)
+    } else { // is_video
+        hls_path.make_video_path(&path)
+    };
+    
+    if is_playlist {
+        let v = tokio::fs::read_to_string(filepath.to_string())
+        .await?;
+        log::info!("get hls playlist : {}", v);
+    }
+
+    
+    Ok(NamedFile::open(filepath)?)
+
+}
+
