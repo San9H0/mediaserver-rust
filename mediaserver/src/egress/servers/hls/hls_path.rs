@@ -11,7 +11,9 @@ pub struct HlsPath {
 
 impl HlsPath {
     pub fn new(session_id: String) -> Self {
-        Self { prefix: format!("{}/{}", BASE_PREFIX, session_id) }
+        Self {
+            prefix: format!("{}/{}", BASE_PREFIX, session_id),
+        }
     }
     pub fn make_master_path(&self, is_llhls: bool) -> String {
         if is_llhls {
@@ -34,31 +36,19 @@ impl HlsPath {
         format!("{}/video/{}", self.prefix, filename)
     }
 
-
     pub fn make_part_path(&self, segment_index: i32, part_index: i32) -> std::path::PathBuf {
-        std::path::PathBuf::from(
-            format!("{}/video/{}_{}_{}.m4s", 
-                self.prefix, 
-                OUTPUT_PREFIX, 
-                segment_index, 
-                part_index,
-            ),
-        )
+        std::path::PathBuf::from(format!(
+            "{}/video/{}_{}_{}.m4s",
+            self.prefix, OUTPUT_PREFIX, segment_index, part_index,
+        ))
     }
     pub fn make_segment_path(&self, segment_index: i32) -> std::path::PathBuf {
-        std::path::PathBuf::from(
-            format!("{}/video/{}_{}.m4s", 
-                self.prefix, 
-                OUTPUT_PREFIX, 
-                segment_index, 
-            ),
-        )
+        std::path::PathBuf::from(format!(
+            "{}/video/{}_{}.m4s",
+            self.prefix, OUTPUT_PREFIX, segment_index,
+        ))
     }
 }
-
-// pub fn get_hls_path(session_id: String, hls: String) -> HlsPath {
-//     HlsPath::new(session_id, hls)
-// }
 
 pub trait PathBufExt {
     fn get_fullpath(&self) -> anyhow::Result<String>;
@@ -66,7 +56,6 @@ pub trait PathBufExt {
     fn get_extension(&self) -> anyhow::Result<String>;
     fn get_parent(&self) -> anyhow::Result<std::path::PathBuf>;
 }
-
 
 impl PathBufExt for std::path::PathBuf {
     fn get_fullpath(&self) -> anyhow::Result<String> {

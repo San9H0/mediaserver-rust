@@ -18,7 +18,6 @@ struct HlsState {
     started: bool,
     prev_pts: u32,
     duration_sum: i64,
-    count: i32,
     prev_time: tokio::time::Instant,
 }
 
@@ -27,7 +26,6 @@ impl HlsState {
         Self {
             started: false,
             index: 0,
-            count: 0,
             prev_time: tokio::time::Instant::now(),
             prev_pts: 0,
             duration_sum: 0,
@@ -141,9 +139,9 @@ impl SessionHandler for HlsHandler {
             pkt.write_interleaved(&mut output_ctx)
         } {
             log::warn!("failed to write packet: {}", err);
+            return;
         };
 
-        log::info!("[TESTDEBUG] video unit.pts:{}, pkt2.pts:{:?}", unit.pts, pkt2.pts());
         let (index, duration) = {
             let mut state = self.state.write().await;
             if state.duration_sum == 0 {
@@ -158,17 +156,16 @@ impl SessionHandler for HlsHandler {
                 return;
             } else if state.prev_time.elapsed() < tokio::time::Duration::from_secs(1) {
                 return;
-            } 
+            }
             let duration = state.duration_sum as f32 / time_base.1 as f32;
             if duration < 1.0 {
                 return;
             }
             state.prev_time = tokio::time::Instant::now();
 
-        
             log::info!("last packet duration:{}, pts: {:?}, dts:{:?}, data[0]:{:02x}, data[1]:{:02x}, data[2]:{:02x}, data[3]:{:02x}, data[4]:{:02x}", 
                 duration, pkt2.pts(), pkt2.dts(), unit.payload[0], unit.payload[1], unit.payload[2], unit.payload[3], unit.payload[4]);
-            
+
             state.duration_sum = 0;
             let index = state.index;
             state.index += 1;
@@ -186,11 +183,9 @@ impl SessionHandler for HlsHandler {
             b
         };
 
-
         if let Err(err) = self.target.write_segment(index, duration, payload).await {
             log::warn!("failed to write segment: {}", err);
         }
-
     }
 
     async fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) {
@@ -202,7 +197,6 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
-        
         let pkt2 = pkt.clone();
         if let Err(err) = {
             let mut output_ctx = self.output_ctx.lock().await;
@@ -212,6 +206,10 @@ impl SessionHandler for HlsHandler {
         };
 
         let mut state = self.state.write().await;
-        log::info!("[TESTDEBUG] audio unit.pts:{}, pkt2.pts:{:?}", unit.pts, pkt2.pts());
+        log::info!(
+            "[TESTDEBUG] audio unit.pts:{}, pkt2.pts:{:?}",
+            unit.pts,
+            pkt2.pts()
+        );
     }
 }

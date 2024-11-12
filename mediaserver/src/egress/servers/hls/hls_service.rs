@@ -1,12 +1,12 @@
-use anyhow::anyhow;
 use m3u8_rs::{MasterPlaylist, MediaPlaylist};
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, sync::RwLock};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::RwLock,
+};
 
 use crate::utils;
 
 use super::{HlsPath, PathBufExt};
-
-const MASTER_M3U8: &str = "index.m3u8";
 const INIT_FILE_NAME: &str = "init.mp4";
 const OUTPUT_FILE_NAME: &str = "output";
 
@@ -19,6 +19,8 @@ pub struct HlsConfig {
 
 pub struct HlsService {
     config: HlsConfig,
+
+    // m3u8, playlist, video
     master: RwLock<MasterPlaylist>,
     playlist_hls: RwLock<MediaPlaylist>,
     playlist_ll: RwLock<MediaPlaylist>,
@@ -33,10 +35,13 @@ impl HlsService {
         let mut varient = m3u8_rs::VariantStream::default();
         varient.bandwidth = 1000000;
         varient.codecs = Some("avc1.42C020,Opus".to_string());
-        varient.resolution = Some(m3u8_rs::Resolution { width: 1280, height: 720 });
+        varient.resolution = Some(m3u8_rs::Resolution {
+            width: 1280,
+            height: 720,
+        });
         varient.frame_rate = Some(29.970);
         varient.uri = "video.m3u8".to_string();
-        master.variants.push(varient);  
+        master.variants.push(varient);
 
         let playlist = MediaPlaylist {
             version: Some(10),
@@ -78,7 +83,7 @@ impl HlsService {
         if let Err(err) = master.write_to(&mut buffer) {
             log::warn!("failed to write playlist: {}", err);
         }
-        
+
         let llhls_master = self.config.hls_path.make_master_path(true);
         utils::files::files::write_file_force(&llhls_master, &buffer).await?;
 
@@ -86,7 +91,6 @@ impl HlsService {
         utils::files::files::write_file_force(&hls_master, &buffer).await?;
         Ok(())
     }
-
 
     pub async fn init_segment(&self, payload: bytes::Bytes) -> anyhow::Result<()> {
         let fullpath = self.config.hls_path.make_init_video_path();
@@ -105,11 +109,14 @@ impl HlsService {
         let part_index = index % self.config.part_max_count;
 
         let mut playlist_ll = self.playlist_ll.write().await;
-        let part = self.config.hls_path.make_part_path(segment_index, part_index);
-      // part video 쓰기
+        let part = self
+            .config
+            .hls_path
+            .make_part_path(segment_index, part_index);
+        // part video 쓰기
         let fullpath = part.get_fullpath()?;
         utils::files::files::write_file_force(&fullpath, &payload).await?;
-    
+
         playlist_ll.parts.push(m3u8_rs::Part {
             duration: duration,
             uri: part.get_filename()?,
@@ -127,7 +134,7 @@ impl HlsService {
             let paths: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
             append_files(std::path::Path::new(&fullpath), &paths).await?;
 
-            let prepload = self.config.hls_path.make_part_path(segment_index+1, 0);
+            let prepload = self.config.hls_path.make_part_path(segment_index + 1, 0);
 
             if playlist_ll.segments.len() >= 3 {
                 playlist_ll.segments.remove(0);
@@ -151,7 +158,10 @@ impl HlsService {
             });
         } else {
             // need media part
-            let preload = self.config.hls_path.make_part_path(segment_index, part_index+1);
+            let preload = self
+                .config
+                .hls_path
+                .make_part_path(segment_index, part_index + 1);
             playlist_ll.preload_hint = Some(m3u8_rs::PreloadHint {
                 r#type: "PART".to_string(),
                 uri: preload.get_filename()?,
@@ -164,7 +174,10 @@ impl HlsService {
             playlist.part_inf = None;
             playlist.parts = vec![];
             playlist.preload_hint = None;
-            playlist.segments.iter_mut().for_each(|segment: &mut m3u8_rs::MediaSegment| segment.parts = vec![]);
+            playlist
+                .segments
+                .iter_mut()
+                .for_each(|segment: &mut m3u8_rs::MediaSegment| segment.parts = vec![]);
             let mut playlist_hls = self.playlist_hls.write().await;
             *playlist_hls = playlist;
 
@@ -176,7 +189,6 @@ impl HlsService {
             let playlist_path = self.config.hls_path.make_playlist_path(false);
             utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
-        
 
         {
             // llhls playlist 쓰기
@@ -188,7 +200,7 @@ impl HlsService {
             utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
 
-        self.created_signal.send((segment_index, part_index));
+        let _ = self.created_signal.send((segment_index, part_index));
         Ok(())
     }
 
@@ -197,8 +209,10 @@ impl HlsService {
     }
 }
 
-
-async fn append_files(output: &std::path::Path, inputs: &[&std::path::Path]) -> tokio::io::Result<()> {
+async fn append_files(
+    output: &std::path::Path,
+    inputs: &[&std::path::Path],
+) -> tokio::io::Result<()> {
     // 출력 파일을 비동기로 열고, 없으면 생성하고 기존 내용을 지웁니다.
     let mut output_file = tokio::fs::File::create(output).await?;
 
@@ -206,7 +220,7 @@ async fn append_files(output: &std::path::Path, inputs: &[&std::path::Path]) -> 
         // 입력 파일을 비동기로 열고 모든 내용을 읽어들입니다.
         let mut input_file = tokio::fs::File::open(input_path).await?;
         let mut buffer = Vec::new();
-        
+
         // 파일 내용을 모두 비동기로 읽어서 버퍼에 저장합니다.
         input_file.read_to_end(&mut buffer).await?;
 

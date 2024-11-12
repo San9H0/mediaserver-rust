@@ -1,7 +1,7 @@
 use crate::hubs::hub::Hub;
 use crate::{egress, ingress};
 use actix_web::middleware::Logger;
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{web, App, HttpServer};
 use std::sync::Arc;
 
 pub mod error;
@@ -43,16 +43,18 @@ fn routes(app: &mut web::ServiceConfig) {
                 .route(web::get().to(hls::handle_get_session)),
         )
         .service(
-            web::resource("/v1/hls/{session_id}/{hls}")
-            .route(web::get().to(|handler: web::Data<Container>, path, query|  {
-                hls::handle_get_hls(handler, "hls", path, query)
-            })),
+            web::resource("/v1/hls/{session_id}/{hls}").route(web::get().to(
+                |handler: web::Data<Container>, path, query| {
+                    hls::handle_get_hls(handler, "hls", path, query)
+                },
+            )),
         )
         .service(
-            web::resource("/v1/llhls/{session_id}/{hls}")
-            .route(web::get().to(|handler: web::Data<Container>, path, query|  {
-                hls::handle_get_hls(handler, "llhls", path, query)
-            })),
+            web::resource("/v1/llhls/{session_id}/{hls}").route(web::get().to(
+                |handler: web::Data<Container>, path, query| {
+                    hls::handle_get_hls(handler, "llhls", path, query)
+                },
+            )),
         );
 }
 

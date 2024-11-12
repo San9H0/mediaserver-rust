@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::{egress::servers::hls::HlsPath, endpoints::Container};
 use actix_files::NamedFile;
 use actix_web::{web, HttpResponse, Responder};
@@ -8,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct HlsResponse {
+    #[serde(rename = "sessionId")]
     session_id: String,
 }
 
@@ -78,19 +77,15 @@ pub struct HlsQuery {
     pub _hls_part: Option<u32>,
 }
 
-
 pub async fn handle_get_hls(
     handler: web::Data<Container>,
-    service_type: &'static str, 
+    service_type: &'static str,
     path: web::Path<(String, String)>,
     query: web::Query<HlsQuery>,
 ) -> actix_web::Result<NamedFile> {
     let is_llhls = service_type == "llhls";
     let (session_id, path) = path.into_inner();
     let query = query.into_inner();
-    
-    let msn = query._hls_msn;
-    let part = query._hls_part;
 
     let is_master = path == "index.m3u8";
     let is_playlist = path == "video.m3u8";
@@ -113,26 +108,22 @@ pub async fn handle_get_hls(
         if rx.changed().await.is_ok() {
             let (recv_msn, recv_part) = *rx.borrow();
         }
-    } 
+    }
 
-    
     let hls_path = HlsPath::new(session_id.to_string());
     let filepath = if is_master {
         hls_path.make_master_path(is_llhls)
     } else if is_playlist {
         hls_path.make_playlist_path(is_llhls)
-    } else { // is_video
+    } else {
+        // is_video
         hls_path.make_video_path(&path)
     };
-    
+
     if is_playlist {
-        let v = tokio::fs::read_to_string(filepath.to_string())
-        .await?;
+        let v = tokio::fs::read_to_string(filepath.to_string()).await?;
         log::info!("get hls playlist : {}", v);
     }
 
-    
     Ok(NamedFile::open(filepath)?)
-
 }
-
