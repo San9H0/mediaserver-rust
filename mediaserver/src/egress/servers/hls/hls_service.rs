@@ -12,9 +12,15 @@ const OUTPUT_FILE_NAME: &str = "output";
 
 #[derive(Clone)]
 pub struct HlsConfig {
+    pub session_id: String,
     pub part_duration: f32,
     pub part_max_count: i32,
     pub hls_path: HlsPath,
+}
+
+pub struct HlsPayload {
+    pub duration: f32,
+    pub payload: bytes::Bytes,
 }
 
 pub struct HlsService {
@@ -69,10 +75,10 @@ impl HlsService {
         let (created_signal, _) = tokio::sync::watch::channel((-1, -1));
 
         Self {
+            config: config.clone(),
             playlist_ll: RwLock::new(playlist_ll),
             playlist_hls: RwLock::new(playlist),
             master: RwLock::new(master),
-            config: config.clone(),
             created_signal,
         }
     }
@@ -99,12 +105,7 @@ impl HlsService {
         Ok(())
     }
 
-    pub async fn write_segment(
-        &self,
-        index: i32,
-        duration: f32,
-        payload: bytes::Bytes,
-    ) -> anyhow::Result<()> {
+    pub async fn write_segment(&self, index: i32, hls_payload: HlsPayload) -> anyhow::Result<()> {
         let segment_index = index / self.config.part_max_count;
         let part_index = index % self.config.part_max_count;
 
@@ -115,10 +116,10 @@ impl HlsService {
             .make_part_path(segment_index, part_index);
         // part video 쓰기
         let fullpath = part.get_fullpath()?;
-        utils::files::files::write_file_force(&fullpath, &payload).await?;
+        utils::files::files::write_file_force(&fullpath, &hls_payload.payload).await?;
 
         playlist_ll.parts.push(m3u8_rs::Part {
-            duration: duration,
+            duration: hls_payload.duration,
             uri: part.get_filename()?,
             independent: true,
         });
@@ -133,8 +134,6 @@ impl HlsService {
             let fullpath = segment.get_fullpath()?;
             let paths: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
             append_files(std::path::Path::new(&fullpath), &paths).await?;
-
-            let prepload = self.config.hls_path.make_part_path(segment_index + 1, 0);
 
             if playlist_ll.segments.len() >= 3 {
                 playlist_ll.segments.remove(0);
@@ -152,6 +151,8 @@ impl HlsService {
                 ..Default::default()
             });
             playlist_ll.parts = vec![];
+
+            let prepload = self.config.hls_path.make_part_path(segment_index + 1, 0);
             playlist_ll.preload_hint = Some(m3u8_rs::PreloadHint {
                 r#type: "PART".to_string(),
                 uri: prepload.get_filename()?,

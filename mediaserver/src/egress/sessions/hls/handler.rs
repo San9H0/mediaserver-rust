@@ -1,4 +1,5 @@
 use crate::codecs::codec::Codec;
+use crate::egress::servers::hls::hls_service::HlsPayload;
 use crate::egress::servers::hls::HlsService;
 use crate::egress::sessions::hls::output::OutputWrap;
 use crate::egress::sessions::hls::track_context;
@@ -16,7 +17,6 @@ use tokio::sync::{Mutex, RwLock};
 struct HlsState {
     index: i32,
     started: bool,
-    prev_pts: u32,
     duration_sum: i64,
     prev_time: tokio::time::Instant,
 }
@@ -27,7 +27,6 @@ impl HlsState {
             started: false,
             index: 0,
             prev_time: tokio::time::Instant::now(),
-            prev_pts: 0,
             duration_sum: 0,
         }
     }
@@ -82,6 +81,49 @@ impl HlsHandler {
             target,
         })
     }
+
+    pub async fn write_hls_segment(&self, pkt: &ffmpeg::packet::Packet) {
+        let (index, duration) = {
+            let mut state = self.state.write().await;
+            state.duration_sum += pkt.duration();
+
+            if !state.started {
+                state.started = true;
+                state.prev_time = tokio::time::Instant::now();
+                return;
+            } else if state.prev_time.elapsed() < tokio::time::Duration::from_secs(1) {
+                return;
+            }
+            let duration = state.duration_sum as f32 / pkt.time_base().1 as f32;
+            if duration < 1.0 {
+                return;
+            }
+            state.prev_time = tokio::time::Instant::now();
+
+            state.duration_sum = 0;
+            let index = state.index;
+            state.index += 1;
+
+            (index, duration)
+        };
+
+        let payload = {
+            let mut output = self.output_ctx.lock().await;
+            let Ok(payload) = output.get_payload() else {
+                log::warn!("failed to get payload");
+                return;
+            };
+            payload
+        };
+
+        if let Err(err) = self
+            .target
+            .write_segment(index, HlsPayload { duration, payload })
+            .await
+        {
+            log::warn!("failed to write segment: {}", err);
+        }
+    }
 }
 
 impl SessionHandler for HlsHandler {
@@ -131,9 +173,8 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
-        let duration = pkt.duration();
-        let time_base = pkt.time_base();
-        let pkt2 = pkt.clone();
+        self.write_hls_segment(&pkt).await;
+
         if let Err(err) = {
             let mut output_ctx = self.output_ctx.lock().await;
             pkt.write_interleaved(&mut output_ctx)
@@ -141,51 +182,6 @@ impl SessionHandler for HlsHandler {
             log::warn!("failed to write packet: {}", err);
             return;
         };
-
-        let (index, duration) = {
-            let mut state = self.state.write().await;
-            if state.duration_sum == 0 {
-                log::info!("first packet? pts: {:?}, dts:{:?}, data[0]:{:02x}, data[1]:{:02x}, data[2]:{:02x}, data[3]:{:02x}, data[4]:{:02x}", 
-                pkt2.pts(), pkt2.dts(), unit.payload[0], unit.payload[1], unit.payload[2], unit.payload[3], unit.payload[4]);
-            }
-            state.duration_sum += duration;
-
-            if !state.started {
-                state.started = true;
-                state.prev_time = tokio::time::Instant::now();
-                return;
-            } else if state.prev_time.elapsed() < tokio::time::Duration::from_secs(1) {
-                return;
-            }
-            let duration = state.duration_sum as f32 / time_base.1 as f32;
-            if duration < 1.0 {
-                return;
-            }
-            state.prev_time = tokio::time::Instant::now();
-
-            log::info!("last packet duration:{}, pts: {:?}, dts:{:?}, data[0]:{:02x}, data[1]:{:02x}, data[2]:{:02x}, data[3]:{:02x}, data[4]:{:02x}", 
-                duration, pkt2.pts(), pkt2.dts(), unit.payload[0], unit.payload[1], unit.payload[2], unit.payload[3], unit.payload[4]);
-
-            state.duration_sum = 0;
-            let index = state.index;
-            state.index += 1;
-            state.prev_pts = unit.pts;
-
-            (index, duration)
-        };
-
-        let payload = {
-            let mut p = self.output_ctx.lock().await;
-            let Ok(b) = p.get_payload() else {
-                log::warn!("failed to get payload");
-                return;
-            };
-            b
-        };
-
-        if let Err(err) = self.target.write_segment(index, duration, payload).await {
-            log::warn!("failed to write segment: {}", err);
-        }
     }
 
     async fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) {
@@ -204,12 +200,5 @@ impl SessionHandler for HlsHandler {
         } {
             log::warn!("failed to write packet: {}", err);
         };
-
-        let mut state = self.state.write().await;
-        log::info!(
-            "[TESTDEBUG] audio unit.pts:{}, pkt2.pts:{:?}",
-            unit.pts,
-            pkt2.pts()
-        );
     }
 }
