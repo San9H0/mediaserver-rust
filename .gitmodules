@@ -1,0 +1,3 @@
+[submodule "media-webfront"]
+	path = media-webfront
+	url = https://github.com/San9H0/media-webfront.git
