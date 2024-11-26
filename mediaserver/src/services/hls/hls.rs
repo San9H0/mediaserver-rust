@@ -22,6 +22,7 @@ pub struct HlsPayload {
     pub payload: bytes::Bytes,
 }
 
+// Hls Service Layer. HLS 를 어떻게 서비스 할지 정의
 pub struct HlsService {
     config: HlsConfig,
 
@@ -89,10 +90,10 @@ impl HlsService {
             log::warn!("failed to write playlist: {}", err);
         }
 
-        let llhls_master = self.config.hls_path.master_endpoint_llhls;
+        let llhls_master = self.config.hls_path.make_master_path(true);
         utils::files::files::write_file_force(&llhls_master, &buffer).await?;
 
-        let hls_master = self.config.hls_path.master_endpoint_hls;
+        let hls_master = self.config.hls_path.make_master_path(false);
         utils::files::files::write_file_force(&hls_master, &buffer).await?;
         Ok(())
     }

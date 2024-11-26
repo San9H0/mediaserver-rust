@@ -6,9 +6,6 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug)]
 pub struct Error(anyhow::Error);
 
-// Custom Result type using the new Error type
-pub type Result<T> = std::result::Result<T, Error>;
-
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
         Self(err)

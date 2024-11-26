@@ -2,17 +2,37 @@ const MASTER_M3U8: &str = "index.m3u8";
 const VIDEO_M3U8: &str = "video.m3u8";
 const INIT_FILE_NAME: &str = "init.mp4";
 const OUTPUT_PREFIX: &str = "output";
-const BASE_PREFIX: &str = "public";
+const PUBLIC: &str = "public";
 
 #[derive(Debug, Clone)]
 pub struct HlsPath {
     pub prefix: String,
+
+    pub master_endpoint_llhls: String,
+    pub master_endpoint_hls: String,
+    pub playlist_endpoint_llhls: String,
+    pub playlist_endpoint_hls: String,
+    pub init_video_endpoint: String,
+    pub video_endpoint_prefx: String,
 }
 
 impl HlsPath {
     pub fn new(session_id: String) -> Self {
+        let prefix = format!("{}/{}", PUBLIC, session_id);
+        let master_endpoint_llhls = fmt::format(format_args!("{prefix}/llhls/{MASTER_M3U8}"));
+        let master_endpoint_hls = fmt::format(format_args!("{prefix}/hls/{MASTER_M3U8}"));
+        let playlist_endpoint_llhls = fmt::format(format_args!("{prefix}/llhls/{VIDEO_M3U8}"));
+        let playlist_endpoint_hls = fmt::format(format_args!("{prefix}/hls/{VIDEO_M3U8}"));
+        let init_video_endpoint = fmt::format(format_args!("{prefix}/video/{INIT_FILE_NAME}"));
+        let video_endpoint_prefx = fmt::format(format_args!("{prefix}/video/"));
         Self {
-            prefix: format!("{}/{}", BASE_PREFIX, session_id),
+            prefix: format!("{}/{}", PUBLIC, session_id),
+            master_endpoint_llhls,
+            playlist_endpoint_llhls,
+            playlist_endpoint_hls,
+            init_video_endpoint,
+            video_endpoint_prefx,
+            master_endpoint_hls,
         }
     }
     pub fn make_master_path(&self, is_llhls: bool) -> String {

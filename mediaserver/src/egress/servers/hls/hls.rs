@@ -40,7 +40,6 @@ impl HlsServer {
         log::info!("hls session started: {}", &session_id);
 
         let service = Arc::new(HlsService::new(HlsConfig {
-            session_id: session_id.to_string(),
             part_duration: 1.0,
             part_max_count: 2,
             hls_path: HlsPath::new(session_id.to_string()),

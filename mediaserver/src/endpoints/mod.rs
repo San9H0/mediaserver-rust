@@ -43,14 +43,14 @@ fn routes(app: &mut web::ServiceConfig) {
                 .route(web::get().to(hls::handle_get_session)),
         )
         .service(
-            web::resource("/v1/hls/{session_id}/{hls}").route(web::get().to(
+            web::resource("/v1/public/{session_id}/hls/{hls}").route(web::get().to(
                 |handler: web::Data<Container>, path, query| {
                     hls::handle_get_hls(handler, "hls", path, query)
                 },
             )),
         )
         .service(
-            web::resource("/v1/llhls/{session_id}/{hls}").route(web::get().to(
+            web::resource("/v1/public/{session_id}/llhls/{hls}").route(web::get().to(
                 |handler: web::Data<Container>, path, query| {
                     hls::handle_get_hls(handler, "llhls", path, query)
                 },
