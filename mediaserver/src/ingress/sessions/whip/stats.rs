@@ -9,7 +9,7 @@ use webrtc::rtcp::reception_report::ReceptionReport;
 use webrtc::rtp;
 use webrtc::util::MarshalSize;
 
-const MAX_SEQ_NO: u16 = 65535;
+const MAX_SEQ_NO: u32 = 65535;
 
 struct ReadStats {
     clock_rate: u32,
@@ -43,7 +43,7 @@ impl ReadStats {
             self.max_seq_no = sn;
         } else if (sn.wrapping_sub(self.max_seq_no)) & 0x8000 == 0 {
             if sn < self.max_seq_no {
-                self.cycle += (MAX_SEQ_NO + 1) as u32;
+                self.cycle += (MAX_SEQ_NO + 1);
             }
             self.max_seq_no = sn;
         } else if (sn.wrapping_sub(self.max_seq_no)) & 0x8000 > 0 {

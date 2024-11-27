@@ -89,16 +89,14 @@ impl HlsService {
             log::warn!("failed to write playlist: {}", err);
         }
 
-        utils::files::files::write_file_force(&self.config.hls_path.master_endpoint_llhls, &buffer)
+        utils::files::files::write_file_force(&self.config.hls_path.get_master_path(), &buffer)
             .await?;
 
-        utils::files::files::write_file_force(&self.config.hls_path.master_endpoint_hls, &buffer)
-            .await?;
         Ok(())
     }
 
     pub async fn init_segment(&self, payload: bytes::Bytes) -> anyhow::Result<()> {
-        let fullpath = self.config.hls_path.make_init_video_path();
+        let fullpath = self.config.hls_path.get_init_video_path();
         utils::files::files::write_file_force(&fullpath, &payload).await?;
 
         Ok(())
@@ -186,8 +184,8 @@ impl HlsService {
                 log::warn!("failed to write playlist: {}", err);
             }
 
-            let playlist_path = self.config.hls_path.make_playlist_path(false);
-            utils::files::files::write_file_force(&playlist_path, &buffer).await?;
+            // let playlist_path = self.config.hls_path.get_playlist_path();
+            // utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
 
         {
@@ -196,7 +194,7 @@ impl HlsService {
             if let Err(err) = playlist_ll.write_to(&mut buffer) {
                 log::warn!("failed to write playlist: {}", err);
             }
-            let playlist_path = self.config.hls_path.make_playlist_path(true);
+            let playlist_path = self.config.hls_path.get_playlist_path();
             utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
 

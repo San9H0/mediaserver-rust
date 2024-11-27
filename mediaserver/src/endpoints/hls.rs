@@ -79,20 +79,11 @@ pub struct HlsQuery {
 
 pub async fn handle_get_hls(
     handler: web::Data<Container>,
-    service_type: &'static str,
     path: web::Path<(String, String)>,
     query: web::Query<HlsQuery>,
 ) -> actix_web::Result<NamedFile> {
-    let is_llhls = service_type == "llhls";
     let (session_id, path) = path.into_inner();
     let query = query.into_inner();
-
-    let is_master = path == "index.m3u8";
-    let is_playlist = path == "video.m3u8";
-    let is_video = path.ends_with(".mp4") || path.ends_with(".m4s");
-    if !is_video && !is_master && !is_playlist {
-        return Err(actix_web::error::ErrorBadRequest("Bad request"));
-    }
 
     let _session = match handler.hls_server.get_session(&session_id).await {
         Ok(session) => session,
@@ -102,6 +93,19 @@ pub async fn handle_get_hls(
         }
     };
 
+    let hls_path = HlsPath::new(session_id.to_string());
+    let Ok(filepath2) = hls_path.get_path(&path) else {
+        println!("invalid path...");
+        return Err(actix_web::error::ErrorNotFound("File not found"));
+    };
+    let is_master = path == "index.m3u8";
+    let is_playlist = path == "video.m3u8";
+    let is_video = path.ends_with(".mp4") || path.ends_with(".m4s");
+    if !is_video && !is_master && !is_playlist {
+        println!("Bad request");
+        return Err(actix_web::error::ErrorBadRequest("Bad request"));
+    }
+
     if let (Some(msn), Some(part)) = (query._hls_msn, query._hls_part) {
         // 두 값이 모두 있는 경우 처리
         let mut rx = _session.service.subscribe_signal();
@@ -110,20 +114,21 @@ pub async fn handle_get_hls(
         }
     }
 
-    let hls_path = HlsPath::new(session_id.to_string());
     let filepath = if is_master {
-        hls_path.make_master_path(is_llhls)
+        hls_path.get_master_path()
     } else if is_playlist {
-        hls_path.make_playlist_path(is_llhls)
+        hls_path.get_playlist_path()
     } else {
         // is_video
-        hls_path.make_video_path(&path)
+        hls_path.get_video_path(&path)
     };
 
-    if is_playlist {
-        let v = tokio::fs::read_to_string(filepath.to_string()).await?;
-        log::info!("get hls playlist : {}", v);
-    }
+    println!("filepath:{}, filepath2:{}", filepath, filepath2);
+
+    // if is_playlist {
+    //     let v = tokio::fs::read_to_string(filepath.to_string()).await?;
+    //     log::info!("get hls playlist : {}", v);
+    // }
 
     Ok(NamedFile::open(filepath)?)
 }

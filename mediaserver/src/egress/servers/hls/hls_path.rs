@@ -9,64 +9,53 @@ const PUBLIC: &str = "public";
 #[derive(Debug, Clone)]
 pub struct HlsPath {
     pub prefix: String,
-
-    pub master_endpoint_llhls: String,
-    pub master_endpoint_hls: String,
-    pub playlist_endpoint_llhls: String,
-    pub playlist_endpoint_hls: String,
-    pub init_video_endpoint: String,
-    pub video_endpoint_prefx: String,
 }
 
 impl HlsPath {
     pub fn new(session_id: String) -> Self {
-        let prefix = format!("{}/{}", PUBLIC, session_id);
-        let master_endpoint_llhls = fmt::format(format_args!("{prefix}/llhls/{MASTER_M3U8}"));
-        let master_endpoint_hls = fmt::format(format_args!("{prefix}/hls/{MASTER_M3U8}"));
-        let playlist_endpoint_llhls = fmt::format(format_args!("{prefix}/llhls/{VIDEO_M3U8}"));
-        let playlist_endpoint_hls = fmt::format(format_args!("{prefix}/hls/{VIDEO_M3U8}"));
-        let init_video_endpoint = fmt::format(format_args!("{prefix}/video/{INIT_FILE_NAME}"));
-        let video_endpoint_prefx = fmt::format(format_args!("{prefix}/video/"));
         Self {
-            prefix: format!("{}/{}", PUBLIC, session_id),
-            master_endpoint_llhls,
-            playlist_endpoint_llhls,
-            playlist_endpoint_hls,
-            init_video_endpoint,
-            video_endpoint_prefx,
-            master_endpoint_hls,
+            prefix: format!("{}/hls/{}", PUBLIC, session_id),
         }
-    }
-    pub fn make_master_path(&self, is_llhls: bool) -> String {
-        if is_llhls {
-            format!("{}/llhls/{}", self.prefix, MASTER_M3U8)
-        } else {
-            format!("{}/hls/{}", self.prefix, MASTER_M3U8)
-        }
-    }
-    pub fn make_playlist_path(&self, is_llhls: bool) -> String {
-        if is_llhls {
-            format!("{}/llhls/{}", self.prefix, VIDEO_M3U8)
-        } else {
-            format!("{}/hls/{}", self.prefix, VIDEO_M3U8)
-        }
-    }
-    pub fn make_init_video_path(&self) -> String {
-        format!("{}/video/{}", self.prefix, INIT_FILE_NAME)
-    }
-    pub fn make_video_path(&self, filename: &str) -> String {
-        format!("{}/video/{}", self.prefix, filename)
     }
 
+    pub fn get_path(&self, filename: &str) -> anyhow::Result<String> {
+        if filename == MASTER_M3U8 {
+            return Ok(self.get_master_path());
+        }
+        if filename == VIDEO_M3U8 {
+            return Ok(self.get_playlist_path());
+        }
+        if filename == INIT_FILE_NAME {
+            return Ok(self.get_init_video_path());
+        }
+
+        if filename.ends_with(".mp4") || filename.ends_with(".m4s") {
+            return Ok(self.get_video_path(filename));
+        }
+        return Err(anyhow::anyhow!("Bad request"));
+    }
+
+    pub fn get_master_path(&self) -> String {
+        format!("{}/{}", self.prefix, MASTER_M3U8)
+    }
+    pub fn get_playlist_path(&self) -> String {
+        format!("{}/{}", self.prefix, VIDEO_M3U8)
+    }
+    pub fn get_init_video_path(&self) -> String {
+        format!("{}/{}", self.prefix, INIT_FILE_NAME)
+    }
+    pub fn get_video_path(&self, filename: &str) -> String {
+        format!("{}/{}", self.prefix, filename)
+    }
     pub fn make_part_path(&self, segment_index: i32, part_index: i32) -> std::path::PathBuf {
         std::path::PathBuf::from(format!(
-            "{}/video/{}_{}_{}.m4s",
+            "{}/{}_{}_{}.m4s",
             self.prefix, OUTPUT_PREFIX, segment_index, part_index,
         ))
     }
     pub fn make_segment_path(&self, segment_index: i32) -> std::path::PathBuf {
         std::path::PathBuf::from(format!(
-            "{}/video/{}_{}.m4s",
+            "{}/{}_{}.m4s",
             self.prefix, OUTPUT_PREFIX, segment_index,
         ))
     }
