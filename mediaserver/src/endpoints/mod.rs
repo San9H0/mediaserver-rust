@@ -50,7 +50,7 @@ fn routes(app: &mut web::ServiceConfig) {
             )),
         )
         .service(
-            web::resource("/v1/public/{session_id}/llhls/{hls}").route(web::get().to(
+            web::resource("/v1/public/hls/{session_id}/{hls}").route(web::get().to(
                 |handler: web::Data<Container>, path, query| {
                     hls::handle_get_hls(handler, "llhls", path, query)
                 },

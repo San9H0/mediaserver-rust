@@ -89,11 +89,11 @@ impl HlsService {
             log::warn!("failed to write playlist: {}", err);
         }
 
-        let llhls_master = self.config.hls_path.master_endpoint_llhls;
-        utils::files::files::write_file_force(&llhls_master, &buffer).await?;
+        utils::files::files::write_file_force(&self.config.hls_path.master_endpoint_llhls, &buffer)
+            .await?;
 
-        let hls_master = self.config.hls_path.master_endpoint_hls;
-        utils::files::files::write_file_force(&hls_master, &buffer).await?;
+        utils::files::files::write_file_force(&self.config.hls_path.master_endpoint_hls, &buffer)
+            .await?;
         Ok(())
     }
 

@@ -1,3 +1,5 @@
+use std::fmt;
+
 const MASTER_M3U8: &str = "index.m3u8";
 const VIDEO_M3U8: &str = "video.m3u8";
 const INIT_FILE_NAME: &str = "init.mp4";
