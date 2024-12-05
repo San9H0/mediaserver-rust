@@ -9,8 +9,8 @@ mod webrtc_wrapper;
 
 use crate::hubs::hub::Hub;
 use config::{Config, File, FileFormat};
-use std::sync::Arc;
 use std::io::Write;
+use std::sync::Arc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -52,7 +52,7 @@ fn init_log(config: Arc<Config>) {
     };
 
     // let log_file = std::fs::File::create("app.log").unwrap();
-// 
+    //
     // env_logger::Builder::new()
     //     .filter_level(log_level)
     //     .format(move |buf, record| {
@@ -70,5 +70,4 @@ fn init_log(config: Arc<Config>) {
         // .duplicate_to_stdout(flexi_logger::Duplicate::All)
         .start()
         .unwrap();
-
 }

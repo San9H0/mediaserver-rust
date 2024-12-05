@@ -89,6 +89,7 @@ impl OutputWrap {
             let pbuffer: *mut *mut u8 = &mut buffer;
             let size =
                 ffmpeg_sys_next::avio_close_dyn_buf((*self.output_ctx.as_mut_ptr()).pb, pbuffer);
+            println!("get_payload size: {}", size);
             let data = std::slice::from_raw_parts(buffer, size as usize);
 
             let byte_buffer = bytes::Bytes::copy_from_slice(data);
@@ -101,8 +102,6 @@ impl OutputWrap {
 
             let output_ctx = self.output_ctx.as_mut_ptr();
             (*output_ctx).pb = avio_ctx;
-
-            
 
             Ok(byte_buffer)
         }

@@ -1,6 +1,5 @@
 use crate::codecs::codec::Codec;
-use crate::egress::servers::hls::hls_service::HlsPayload;
-use crate::egress::servers::hls::HlsService;
+use crate::egress::services::hls::service::{HlsPayload, HlsService};
 use crate::egress::sessions::hls::output::OutputWrap;
 use crate::egress::sessions::hls::track_context;
 use crate::egress::sessions::session::SessionHandler;
@@ -10,6 +9,8 @@ use crate::hubs::unit::HubUnit;
 use crate::utils::types::types;
 use bitstreams::h264::nal_unit::NalUnit;
 use ffmpeg_next as ffmpeg;
+use mp4::Mp4Config;
+use std::io::{Cursor, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -91,13 +92,13 @@ impl HlsHandler {
                 state.started = true;
                 state.prev_time = tokio::time::Instant::now();
                 return;
-            } else if state.prev_time.elapsed() < tokio::time::Duration::from_secs(1) {
+            } else if state.prev_time.elapsed() < tokio::time::Duration::from_millis(500) {
                 return;
             }
             let duration = state.duration_sum as f32 / pkt.time_base().1 as f32;
-            if duration < 1.0 {
-                return;
-            }
+            // if duration < 1.0 {
+            //     return;
+            // }
             state.prev_time = tokio::time::Instant::now();
 
             state.duration_sum = 0;
@@ -126,14 +127,51 @@ impl HlsHandler {
     }
 }
 
+fn write_to_temp_file(data: Vec<u8>, file_path: &str) -> anyhow::Result<()> {
+    // 지정된 경로에 파일 생성
+    let path = std::path::Path::new(file_path);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+
+    // Vec<u8> 데이터를 파일에 작성
+    file.write_all(&data)?;
+
+    Ok(())
+}
+
 impl SessionHandler for HlsHandler {
     type TrackContext = track_context::TrackContext;
 
     async fn on_initialize(&self) -> anyhow::Result<()> {
+        let config = Mp4Config {
+            major_brand: str::parse("mp42").unwrap(),
+            minor_version: 1,
+            compatible_brands: vec![
+                str::parse("mp41").unwrap(),
+                str::parse("mp42").unwrap(),
+                str::parse("isom").unwrap(),
+                str::parse("hlsf").unwrap(),
+            ],
+            timescale: 1000,
+        };
+
+        let data = Cursor::new(Vec::<u8>::new());
+        let mut writer = mp4::Mp4Writer::write_start(data, &config)?;
+        writer.write_end()?;
+
+        let data: Vec<u8> = writer.into_writer().into_inner();
+        write_to_temp_file(data, "./test.mp4");
+
         {
             let mut output_ctx = self.output_ctx.lock().await;
             let mut dict = ffmpeg::Dictionary::new();
-            dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
+            // dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
+            dict.set("movflags", "empty_moov+default_base_moof");
+            dict.set("frag_duration", "100000"); // 1_000_000
+
             output_ctx.write_header_with(dict)?;
         }
 

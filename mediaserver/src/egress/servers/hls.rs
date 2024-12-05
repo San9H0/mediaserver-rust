@@ -1,14 +1,13 @@
+use crate::egress::services::hls::path::HlsPath;
+use crate::egress::services::hls::service::{HlsConfig, HlsService};
+use crate::egress::sessions::hls::handler::HlsHandler;
 use crate::egress::sessions::session::Session;
-use crate::egress::{servers::hls::HlsPath, sessions::hls::handler::HlsHandler};
 use crate::hubs::hub::Hub;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-
-use super::{HlsConfig, HlsService};
-
 pub struct HlsServer {
     hub: Arc<Hub>,
 
@@ -40,7 +39,7 @@ impl HlsServer {
         log::info!("hls session started: {}", &session_id);
 
         let service = Arc::new(HlsService::new(HlsConfig {
-            part_duration: 1.0,
+            part_duration: 0.5,
             part_max_count: 2,
             hls_path: HlsPath::new(session_id.to_string()),
         }));
@@ -83,6 +82,7 @@ impl HlsServer {
 
         Ok(session)
     }
+
     pub async fn stop_session(&self, session_id: String) -> anyhow::Result<()> {
         let mut sessions = self.sessions.write().await;
         let session = sessions

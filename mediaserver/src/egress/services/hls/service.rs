@@ -6,7 +6,8 @@ use tokio::{
 
 use crate::utils;
 
-use super::{HlsPath, PathBufExt};
+use super::path::{HlsPath, PathBufExt};
+
 const INIT_FILE_NAME: &str = "init.mp4";
 const OUTPUT_FILE_NAME: &str = "output";
 
@@ -50,10 +51,10 @@ impl HlsService {
 
         let playlist = MediaPlaylist {
             version: Some(10),
-            target_duration: ((config.part_duration as i32) * config.part_max_count) as u64,
+            target_duration: (1) as u64,
             server_control: Some(m3u8_rs::ServerControl {
                 can_block_reload: true,
-                part_hold_back: Some(3.0),
+                part_hold_back: Some(0.5),
                 ..Default::default()
             }),
             media_sequence: 0,
@@ -115,6 +116,11 @@ impl HlsService {
         let fullpath = part.get_fullpath()?;
         utils::files::files::write_file_force(&fullpath, &hls_payload.payload).await?;
 
+        println!(
+            "hls_payload.duration:{}, payload.len:{}",
+            hls_payload.duration,
+            hls_payload.payload.len()
+        );
         playlist_ll.parts.push(m3u8_rs::Part {
             duration: hls_payload.duration,
             uri: part.get_filename()?,
@@ -132,7 +138,7 @@ impl HlsService {
             let paths: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
             append_files(std::path::Path::new(&fullpath), &paths).await?;
 
-            if playlist_ll.segments.len() >= 3 {
+            if playlist_ll.segments.len() > 2 {
                 playlist_ll.segments.remove(0);
                 playlist_ll.media_sequence += 1;
             }
@@ -183,9 +189,6 @@ impl HlsService {
             if let Err(err) = playlist_hls.write_to(&mut buffer) {
                 log::warn!("failed to write playlist: {}", err);
             }
-
-            // let playlist_path = self.config.hls_path.get_playlist_path();
-            // utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
 
         {

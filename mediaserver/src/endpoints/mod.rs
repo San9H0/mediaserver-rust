@@ -1,7 +1,7 @@
 use crate::hubs::hub::Hub;
 use crate::{egress, ingress};
 use actix_web::middleware::Logger;
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpRequest, HttpServer};
 use std::sync::Arc;
 
 pub mod error;
@@ -44,8 +44,8 @@ fn routes(app: &mut web::ServiceConfig) {
         )
         .service(
             web::resource("/v1/public/hls/{session_id}/{filename}").route(web::get().to(
-                |handler: web::Data<Container>, path, query| {
-                    hls::handle_get_hls(handler, path, query)
+                |req: HttpRequest, handler: web::Data<Container>, path, query| {
+                    hls::handle_get_hls(req, handler, path, query)
                 },
             )),
         );
