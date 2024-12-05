@@ -15,19 +15,18 @@ export const createPeerConnectionPublisher = async (mediaStream: MediaStream, co
     const pc = new RTCPeerConnection(rtpConfig);
 
     const audioInit: RTCRtpTransceiverInit = {
-        direction: 'sendrecv',
+        direction: 'sendonly',
         sendEncodings: audioEncodings,
         streams: [mediaStream],
     };
     const videoInit: RTCRtpTransceiverInit = {
-        direction: 'sendrecv',
+        direction: 'sendonly',
         sendEncodings: videoEncodings,
         streams: [mediaStream],
     };
     const audioTransceiver: RTCRtpTransceiver = pc.addTransceiver('audio', audioInit);
     const videoTransceiver: RTCRtpTransceiver = pc.addTransceiver('video', videoInit);
-    console.log("mediaStream.getAudioTracks():", mediaStream.getAudioTracks());
-    console.log("mediaStream.getVideoTracks():", mediaStream.getVideoTracks());
+
     pc.addTrack(mediaStream.getAudioTracks()[0], mediaStream);
     pc.addTrack(mediaStream.getVideoTracks()[0], mediaStream);
 
@@ -36,7 +35,7 @@ export const createPeerConnectionPublisher = async (mediaStream: MediaStream, co
         params.degradationPreference = "maintain-resolution";
         await videoTransceiver.sender.setParameters(params);
     }
-    console.log('videoTransceiver:', videoTransceiver);
+    
     if (config.videoCodecName) {
         const videoProfile = config.videoCodecName === "h264" ? "42001f" : config.videoCodecName === "vp9" ? "profile-id=0" : "";
         console.log('videoProfile:', videoProfile);

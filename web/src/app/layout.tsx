@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         {/* 푸터 */}
         <footer className="bg-gray-800 text-white text-center py-4">
-          <p>© 2024 My Media Server. All rights reserved.</p>
+          <p>© 2024 San9H0 Media Server. All rights reserved.</p>
         </footer>
       </body>
     </html>
