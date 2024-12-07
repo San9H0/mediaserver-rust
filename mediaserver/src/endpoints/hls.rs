@@ -1,8 +1,12 @@
-use crate::{egress::services::hls::path::HlsPath, endpoints::Container};
+use std::path::{Path, PathBuf};
+
+use crate::{egress::services::hls::config::HlsConfig, endpoints::Container};
 use actix_files::NamedFile;
 use actix_web::{http, web, HttpRequest, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::{Deserialize, Serialize};
+
+use super::file;
 
 #[derive(Serialize)]
 struct HlsResponse {
@@ -83,7 +87,13 @@ pub async fn handle_get_hls(
     path: web::Path<(String, String)>,
     query: web::Query<HlsQuery>,
 ) -> actix_web::Result<HttpResponse> {
-    let (session_id, path) = path.into_inner();
+    let (session_id, filename) = path.into_inner();
+
+    log::info!(
+        "get hls body streamID:{}, filename:{} messageType:request",
+        session_id,
+        filename
+    );
     let query = query.into_inner();
 
     let _session = match handler.hls_server.get_session(&session_id).await {
@@ -94,9 +104,9 @@ pub async fn handle_get_hls(
         }
     };
 
-    let hls_path = HlsPath::new(session_id.to_string());
-    let Ok(filepath) = hls_path.get_path(&path) else {
-        println!("invalid path...");
+    let hls_path = _session.config.clone();
+    let Ok(filepath) = hls_path.get_path(&filename) else {
+        log::error!("failed to get path");
         return Err(actix_web::error::ErrorNotFound("File not found"));
     };
 
@@ -108,25 +118,29 @@ pub async fn handle_get_hls(
         }
     };
 
-    // TODO: for debug. remove later
-    let is_master = path == "index.m3u8";
-    let is_playlist = path == "video.m3u8";
-    let is_video = path.ends_with(".mp4") || path.ends_with(".m4s");
-    if !is_video && !is_master && !is_playlist {
+    if !filename.ends_with(".m3u8") && !filename.ends_with(".mp4") && !filename.ends_with(".m4s") {
         println!("Bad request");
         return Err(actix_web::error::ErrorBadRequest("Bad request"));
     }
-    if is_playlist {
+
+    if filename.ends_with(".m3u8") {
         let v = tokio::fs::read_to_string(filepath.to_string()).await?;
         log::info!("get hls playlist : {}", v);
+    } else if filename.ends_with(".mp4") || filename.ends_with(".m4s") {
+        let v = tokio::fs::read(filepath.to_string()).await?;
+        log::info!("get hls media : {:?}", v.len());
     }
+    // if is_playlist {
+    //     let v = tokio::fs::read_to_string(filepath.to_string()).await?;
+    //     log::info!("get hls playlist : {}", v);
+    // }
 
     // NamedFile 생성
     // let mut named_file = NamedFile::open(filepath)?;
 
-    let cache_control = if path.ends_with(".m3u8") {
+    let cache_control = if filename.ends_with(".m3u8") {
         "max-age=1, public"
-    } else if path.ends_with(".mp4") || path.ends_with(".m4s") {
+    } else if filename.ends_with(".mp4") || filename.ends_with(".m4s") {
         "max-age=3600, public"
     } else {
         "no-cache"

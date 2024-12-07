@@ -99,7 +99,26 @@ export default function HLSWatch() {
 
   return (
     <div className="container">
-      <h1>LL-HLS 시청</h1>
+      <h1 className="text-4xl font-bold text-center text-primary">
+        HLS Subscriber
+      </h1>
+
+      <div className="flex flex-col space-y-4">
+        <div>
+          <input
+            type="text"
+            placeholder="Enter Sesssion ID"
+            ref={sessionIdRef}
+            className="input input-bordered w-full"
+          />
+        </div>
+
+        <div className="flex space-x-4">
+          <button className="btn btn-outline btn-error" onClick={handleStart}>
+            Start!
+          </button>
+        </div>
+      </div>
       <div>
         <input type="text" placeholder="Enter Session ID" ref={sessionIdRef} />
         <button onClick={handleStart}>Start</button>

@@ -29,7 +29,6 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| num_cpus::get());
 
     log::info!("Starting server");
-    println!("Hello, world!");
 
     let _tokio_runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(num_workers) // 스레드 수를 8개로 설정

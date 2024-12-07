@@ -43,7 +43,7 @@ fn routes(app: &mut web::ServiceConfig) {
                 .route(web::get().to(hls::handle_get_session)),
         )
         .service(
-            web::resource("/v1/public/hls/{session_id}/{filename}").route(web::get().to(
+            web::resource("/v1/public/hls/{session_id}/{filename:.*}").route(web::get().to(
                 |req: HttpRequest, handler: web::Data<Container>, path, query| {
                     hls::handle_get_hls(req, handler, path, query)
                 },

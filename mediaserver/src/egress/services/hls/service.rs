@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use m3u8_rs::{MasterPlaylist, MediaPlaylist};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -6,17 +8,9 @@ use tokio::{
 
 use crate::utils;
 
-use super::path::{HlsPath, PathBufExt};
+use super::config::{HlsConfig, PathBufExt};
 
 const INIT_FILE_NAME: &str = "init.mp4";
-const OUTPUT_FILE_NAME: &str = "output";
-
-#[derive(Clone)]
-pub struct HlsConfig {
-    pub part_duration: f32,
-    pub part_max_count: i32,
-    pub hls_path: HlsPath,
-}
 
 pub struct HlsPayload {
     pub duration: f32,
@@ -28,8 +22,8 @@ pub struct HlsService {
 
     // m3u8, playlist, video
     master: RwLock<MasterPlaylist>,
-    playlist_hls: RwLock<MediaPlaylist>,
-    playlist_ll: RwLock<MediaPlaylist>,
+    video0: RwLock<MediaPlaylist>,
+
     created_signal: tokio::sync::watch::Sender<(i32, i32)>,
 }
 
@@ -38,15 +32,17 @@ impl HlsService {
         let mut master = MasterPlaylist::default();
         master.version = Some(10);
         master.independent_segments = true;
+
+        let playlist_path = config.video_m3u8_path();
         let mut varient = m3u8_rs::VariantStream::default();
-        varient.bandwidth = 1000000;
-        varient.codecs = Some("avc1.42C020,Opus".to_string());
+        varient.bandwidth = config.bandwidth;
+        varient.codecs = Some(config.codecs.to_string());
         varient.resolution = Some(m3u8_rs::Resolution {
-            width: 1280,
-            height: 720,
+            width: config.width,
+            height: config.height,
         });
-        varient.frame_rate = Some(29.970);
-        varient.uri = "video.m3u8".to_string();
+        varient.frame_rate = Some(config.framerate);
+        varient.uri = playlist_path;
         master.variants.push(varient);
 
         let playlist = MediaPlaylist {
@@ -65,9 +61,9 @@ impl HlsService {
             ..Default::default()
         };
 
-        let mut playlist_ll = playlist.clone();
-        playlist_ll.part_inf = Some(config.part_duration);
-        playlist_ll.map = Some(m3u8_rs::Map {
+        let mut video0 = playlist.clone();
+        video0.part_inf = Some(config.part_duration);
+        video0.map = Some(m3u8_rs::Map {
             uri: INIT_FILE_NAME.to_string(),
             ..Default::default()
         });
@@ -76,8 +72,7 @@ impl HlsService {
 
         Self {
             config: config.clone(),
-            playlist_ll: RwLock::new(playlist_ll),
-            playlist_hls: RwLock::new(playlist),
+            video0: RwLock::new(video0),
             master: RwLock::new(master),
             created_signal,
         }
@@ -90,14 +85,13 @@ impl HlsService {
             log::warn!("failed to write playlist: {}", err);
         }
 
-        utils::files::files::write_file_force(&self.config.hls_path.get_master_path(), &buffer)
-            .await?;
+        utils::files::files::write_file_force(&self.config.get_master_path(), &buffer).await?;
 
         Ok(())
     }
 
     pub async fn init_segment(&self, payload: bytes::Bytes) -> anyhow::Result<()> {
-        let fullpath = self.config.hls_path.get_init_video_path();
+        let fullpath = self.config.get_init_video_path();
         utils::files::files::write_file_force(&fullpath, &payload).await?;
 
         Ok(())
@@ -107,97 +101,67 @@ impl HlsService {
         let segment_index = index / self.config.part_max_count;
         let part_index = index % self.config.part_max_count;
 
-        let mut playlist_ll = self.playlist_ll.write().await;
-        let part = self
-            .config
-            .hls_path
-            .make_part_path(segment_index, part_index);
+        let mut video0 = self.video0.write().await;
+        let part = self.config.make_part_path(segment_index, part_index);
         // part video 쓰기
         let fullpath = part.get_fullpath()?;
         utils::files::files::write_file_force(&fullpath, &hls_payload.payload).await?;
 
-        println!(
-            "hls_payload.duration:{}, payload.len:{}",
-            hls_payload.duration,
-            hls_payload.payload.len()
-        );
-        playlist_ll.parts.push(m3u8_rs::Part {
+        video0.parts.push(m3u8_rs::Part {
             duration: hls_payload.duration,
             uri: part.get_filename()?,
             independent: true,
         });
         if part_index == self.config.part_max_count - 1 {
             // need media segment
-            let segment = self.config.hls_path.make_segment_path(segment_index);
+            let segment = self.config.make_segment_path(segment_index);
             let mut paths: Vec<std::path::PathBuf> = Vec::new();
             for i in 0..self.config.part_max_count {
-                let filepath = self.config.hls_path.make_part_path(segment_index, i);
+                let filepath = self.config.make_part_path(segment_index, i);
                 paths.push(filepath);
             }
             let fullpath = segment.get_fullpath()?;
             let paths: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
             append_files(std::path::Path::new(&fullpath), &paths).await?;
 
-            if playlist_ll.segments.len() > 2 {
-                playlist_ll.segments.remove(0);
-                playlist_ll.media_sequence += 1;
+            if video0.segments.len() > self.config.part_max_count as usize {
+                video0.segments.remove(0);
+                video0.media_sequence += 1;
             }
 
-            let segment_duration: f32 = playlist_ll.parts.iter().map(|part| part.duration).sum();
-            let parts_clone = playlist_ll.parts.clone();
+            let segment_duration: f32 = video0.parts.iter().map(|part| part.duration).sum();
+            let parts_clone = video0.parts.clone();
             let title = segment_index.to_string();
-            playlist_ll.segments.push(m3u8_rs::MediaSegment {
+            video0.segments.push(m3u8_rs::MediaSegment {
                 uri: segment.get_filename()?,
                 duration: segment_duration,
                 title: Some(title),
                 parts: parts_clone,
                 ..Default::default()
             });
-            playlist_ll.parts = vec![];
+            video0.parts = vec![];
 
-            let prepload = self.config.hls_path.make_part_path(segment_index + 1, 0);
-            playlist_ll.preload_hint = Some(m3u8_rs::PreloadHint {
+            let prepload = self.config.make_part_path(segment_index + 1, 0);
+            video0.preload_hint = Some(m3u8_rs::PreloadHint {
                 r#type: "PART".to_string(),
                 uri: prepload.get_filename()?,
             });
         } else {
             // need media part
-            let preload = self
-                .config
-                .hls_path
-                .make_part_path(segment_index, part_index + 1);
-            playlist_ll.preload_hint = Some(m3u8_rs::PreloadHint {
+            let preload = self.config.make_part_path(segment_index, part_index + 1);
+            video0.preload_hint = Some(m3u8_rs::PreloadHint {
                 r#type: "PART".to_string(),
                 uri: preload.get_filename()?,
             });
         }
 
         {
-            // hls playlist 쓰기
-            let mut playlist = playlist_ll.clone();
-            playlist.part_inf = None;
-            playlist.parts = vec![];
-            playlist.preload_hint = None;
-            playlist
-                .segments
-                .iter_mut()
-                .for_each(|segment: &mut m3u8_rs::MediaSegment| segment.parts = vec![]);
-            let mut playlist_hls = self.playlist_hls.write().await;
-            *playlist_hls = playlist;
-
-            let mut buffer = Vec::new();
-            if let Err(err) = playlist_hls.write_to(&mut buffer) {
-                log::warn!("failed to write playlist: {}", err);
-            }
-        }
-
-        {
             // llhls playlist 쓰기
             let mut buffer = Vec::new();
-            if let Err(err) = playlist_ll.write_to(&mut buffer) {
+            if let Err(err) = video0.write_to(&mut buffer) {
                 log::warn!("failed to write playlist: {}", err);
             }
-            let playlist_path = self.config.hls_path.get_playlist_path();
+            let playlist_path = self.config.get_playlist_path();
             utils::files::files::write_file_force(&playlist_path, &buffer).await?;
         }
 

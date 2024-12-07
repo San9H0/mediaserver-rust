@@ -1,5 +1,5 @@
-use crate::egress::services::hls::path::HlsPath;
-use crate::egress::services::hls::service::{HlsConfig, HlsService};
+use crate::egress::services::hls::config::{ConfigParams, HlsConfig};
+use crate::egress::services::hls::service::HlsService;
 use crate::egress::sessions::hls::handler::HlsHandler;
 use crate::egress::sessions::session::Session;
 use crate::hubs::hub::Hub;
@@ -17,6 +17,7 @@ pub struct HlsServer {
 pub struct HlsSession {
     pub handler: Arc<Session<HlsHandler>>,
     pub service: Arc<HlsService>,
+    pub config: HlsConfig,
 }
 
 impl HlsServer {
@@ -38,11 +39,19 @@ impl HlsServer {
         let session_id = Uuid::new_v4().to_string();
         log::info!("hls session started: {}", &session_id);
 
-        let service = Arc::new(HlsService::new(HlsConfig {
+        let config = HlsConfig::new(ConfigParams {
+            session_id: session_id.clone(),
+            video_base: "video0".to_string(),
+            codecs: "avc1.42C020,Opus".to_string(),
+            width: 1280,
+            height: 720,
+            bandwidth: 1000000,
+            framerate: 30.0,
             part_duration: 0.5,
             part_max_count: 2,
-            hls_path: HlsPath::new(session_id.to_string()),
-        }));
+        });
+
+        let service = Arc::new(HlsService::new(config.clone()));
         service.init().await?;
 
         let handler = HlsHandler::new(&hub_stream, service.clone()).await?;
@@ -54,6 +63,7 @@ impl HlsServer {
             Arc::new(HlsSession {
                 handler: sess.clone(),
                 service: service.clone(),
+                config: config.clone(),
             }),
         );
 

@@ -43,7 +43,7 @@ impl ReadStats {
             self.max_seq_no = sn;
         } else if (sn.wrapping_sub(self.max_seq_no)) & 0x8000 == 0 {
             if sn < self.max_seq_no {
-                self.cycle += (MAX_SEQ_NO + 1);
+                self.cycle += MAX_SEQ_NO + 1;
             }
             self.max_seq_no = sn;
         } else if (sn.wrapping_sub(self.max_seq_no)) & 0x8000 > 0 {
