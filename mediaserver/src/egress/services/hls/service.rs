@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Cursor, sync::Arc};
 
 use m3u8_rs::{MasterPlaylist, MediaPlaylist};
 use tokio::{
@@ -94,6 +94,24 @@ impl HlsService {
         let fullpath = self.config.get_init_video_path();
         utils::files::files::write_file_force(&fullpath, &payload).await?;
 
+        Ok(())
+    }
+
+    pub async fn init_segment2(&self, payload: bytes::Bytes) -> anyhow::Result<()> {
+        let fullpath = self.config.get_init2_video_path();
+        utils::files::files::write_file_force(&fullpath, &payload).await?;
+
+        Ok(())
+    }
+
+    pub async fn write_segment2(&self, index: i32, hls_payload: HlsPayload) -> anyhow::Result<()> {
+        let segment_index = index / self.config.part_max_count;
+        let part_index = index % self.config.part_max_count;
+        {
+            let part_temp = self.config.make_part2_path(segment_index, part_index);
+            let fullpath_temp: String = part_temp.get_fullpath()?;
+            utils::files::files::write_file_force(&fullpath_temp, &hls_payload.payload).await?;
+        }
         Ok(())
     }
 

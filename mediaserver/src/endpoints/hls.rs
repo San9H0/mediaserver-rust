@@ -6,8 +6,6 @@ use actix_web::{http, web, HttpRequest, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 use serde::{Deserialize, Serialize};
 
-use super::file;
-
 #[derive(Serialize)]
 struct HlsResponse {
     #[serde(rename = "sessionId")]

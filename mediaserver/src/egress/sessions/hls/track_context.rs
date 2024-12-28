@@ -1,8 +1,7 @@
 use crate::codecs::bfs::Bfs;
 use crate::codecs::codec::Codec;
 use crate::hubs::unit::HubUnit;
-use ffmpeg_next as ffmpeg;
-use ffmpeg_next::Rescale;
+use crate::utils::{self, rescale};
 
 pub struct TrackContext {
     codec: Codec,
@@ -27,7 +26,12 @@ impl TrackContext {
             dts: 0,
         }
     }
-    pub fn make_packet(&mut self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
+
+    pub fn track_id(&self) -> u32 {
+        (self.idx + 1) as u32
+    }
+
+    pub fn make_packet(&mut self, unit: &HubUnit) -> Option<utils::packet::packet::Packet> {
         if !self.started {
             self.started = true;
             self.base_ts = unit.pts;
@@ -40,28 +44,36 @@ impl TrackContext {
             self.dts = unit.dts - self.base_ts;
         }
 
-        let Some(mut pkt) = self.bfs.make_packet(&unit) else {
+        let Some(mut pkt) = self.bfs.make_packet2(&unit) else {
             return None;
         };
 
-        let input_time_base = ffmpeg::Rational::new(1, unit.timebase as i32);
-        let output_time_base = ffmpeg::Rational::new(1, self.codec.clock_rate() as i32);
+        let input_timebase = rescale::rescale::Rational::new(1, unit.timebase as i32);
+        let output_timebase = rescale::rescale::Rational::new(1, self.codec.clock_rate() as i32);
+
+        let pts = rescale::rescale::rescale_with_rounding(
+            self.pts as i64,
+            &input_timebase,
+            &output_timebase,
+        );
+        let dts = rescale::rescale::rescale_with_rounding(
+            self.dts as i64,
+            &input_timebase,
+            &output_timebase,
+        );
+        let duration = rescale::rescale::rescale_with_rounding(
+            unit.duration as i64,
+            &input_timebase,
+            &output_timebase,
+        );
 
         pkt.set_stream(self.idx);
-        pkt.set_pts(Some(
-            (self.pts as i64).rescale(input_time_base, output_time_base),
-        ));
-        pkt.set_dts(Some(
-            (self.dts as i64).rescale(input_time_base, output_time_base),
-        ));
-        pkt.set_time_base(output_time_base);
-        pkt.set_duration((unit.duration as i64).rescale_with(
-            input_time_base,
-            output_time_base,
-            ffmpeg::mathematics::Rounding::NearInfinity,
-        ));
+        pkt.set_pts(pts);
+        pkt.set_dts(dts);
+        pkt.set_time_base(output_timebase);
+        pkt.set_duration(duration);
         if unit.frame_info.flag == 1 {
-            pkt.set_flags(ffmpeg::packet::Flags::KEY);
+            pkt.set_flags(1);
         }
 
         Some(pkt)

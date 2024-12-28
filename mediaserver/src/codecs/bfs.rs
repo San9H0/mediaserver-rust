@@ -1,8 +1,7 @@
-use crate::codecs;
 use crate::codecs::bfs::Bfs::{Opus, H264};
 use crate::hubs::unit::HubUnit;
+use crate::{codecs, utils};
 use anyhow::anyhow;
-use ffmpeg_next as ffmpeg;
 
 pub enum Bfs {
     Opus,
@@ -17,8 +16,7 @@ impl Bfs {
             _ => Err(anyhow!("Unsupported codec: {}", mime_type)),
         }
     }
-
-    pub fn make_packet(&self, unit: &HubUnit) -> Option<ffmpeg::packet::Packet> {
+    pub fn make_packet2(&self, unit: &HubUnit) -> Option<utils::packet::packet::Packet> {
         match self {
             Opus => codecs::opus::bfs::make_packet(unit),
             H264 => codecs::h264::bfs::make_packet_with_avcc(unit),

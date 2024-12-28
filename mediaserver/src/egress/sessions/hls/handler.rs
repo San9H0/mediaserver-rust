@@ -1,15 +1,12 @@
 use crate::codecs::codec::Codec;
 use crate::egress::services::hls::service::{HlsPayload, HlsService};
-use crate::egress::sessions::hls::output::OutputWrap;
 use crate::egress::sessions::hls::track_context;
 use crate::egress::sessions::session::SessionHandler;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
+use crate::utils;
 use crate::utils::types::types;
-use bitstreams::h264::nal_unit::NalUnit;
-use ffmpeg_next as ffmpeg;
-use mp4::Mp4Config;
 use std::io::{Cursor, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -37,53 +34,79 @@ pub struct HlsHandler {
     started: AtomicBool,
     state: RwLock<HlsState>,
 
-    output_ctx: Mutex<OutputWrap>,
     sources: Vec<Arc<HubSource>>,
     target: Arc<HlsService>,
+
+    fmp4: Mutex<mp4::Fmp4Writer>,
 }
 
 impl HlsHandler {
     pub async fn new(hub_stream: &Arc<HubStream>, target: Arc<HlsService>) -> anyhow::Result<Self> {
-        let mut output_ctx = OutputWrap::new()?;
+        let mut width = 0;
+        let mut height = 0;
+        let mut sps = None;
+        let mut pps = None;
+        let mut audio_timescale = 0;
+        let mut video_timescale = 0;
+
         let mut sources = vec![];
         for source in hub_stream.get_sources().await {
             let codec_info = source.get_codec().await.unwrap();
             if codec_info.kind() == types::MediaKind::Audio {
-                let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
-                    .ok_or(ffmpeg::Error::EncoderNotFound)?;
-                let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
-                let mut audio = encoder_ctx.encoder().audio()?;
-                let _ = codec_info.set_av_audio(&mut audio);
-                let encoder = audio.open_as(codec)?;
-                output_ctx.add_stream_with(&encoder)?;
+                audio_timescale = codec_info.clock_rate();
             } else if codec_info.kind() == types::MediaKind::Video {
-                let codec = ffmpeg::codec::encoder::find(codec_info.av_codec_id())
-                    .ok_or(ffmpeg::Error::EncoderNotFound)?;
-                let encoder_ctx = ffmpeg::codec::context::Context::new_with_codec(codec);
-                let mut video = encoder_ctx.encoder().video()?;
-                let _ = codec_info.set_av_video(&mut video)?;
-                let encoder = video.open_as(codec)?;
-                println!(
-                    "encoder.time_base(): {}, {}",
-                    encoder.time_base().0,
-                    encoder.time_base().1
-                );
+                sps = codec_info.sps();
+                pps = codec_info.pps();
 
-                output_ctx.add_stream_with(&encoder)?;
+                width = codec_info.width();
+                height = codec_info.height();
+
+                video_timescale = codec_info.clock_rate();
             }
             sources.push(source);
         }
 
+        let fmp4_config = mp4::Mp4Config {
+            major_brand: str::parse("iso5").unwrap(),
+            minor_version: 512,
+            compatible_brands: vec![
+                str::parse("iso5").unwrap(),
+                str::parse("iso6").unwrap(),
+                str::parse("mp41").unwrap(),
+            ],
+            timescale: 1000,
+        };
+        let mut fmp4 = mp4::Fmp4Writer::new(&fmp4_config).unwrap();
+        fmp4.add_track(&mp4::TrackConfig {
+            track_type: mp4::TrackType::Audio,
+            timescale: audio_timescale,
+            language: String::from("und"),
+            media_conf: mp4::MediaConfig::OpusConfig(mp4::OpusConfig {}),
+        })
+        .unwrap();
+        fmp4.add_track(&mp4::TrackConfig {
+            track_type: mp4::TrackType::Video,
+            timescale: video_timescale,
+            language: String::from("und"),
+            media_conf: mp4::MediaConfig::AvcConfig(mp4::AvcConfig {
+                width: width as u16,
+                height: height as u16,
+                seq_param_set: sps.unwrap(),
+                pic_param_set: pps.unwrap(),
+            }),
+        })
+        .unwrap();
+
         Ok(HlsHandler {
             state: RwLock::new(HlsState::new()),
             started: AtomicBool::new(false),
-            output_ctx: Mutex::new(output_ctx),
             sources,
             target,
+            fmp4: Mutex::new(fmp4),
         })
     }
 
-    pub async fn write_hls_segment(&self, pkt: &ffmpeg::packet::Packet) {
+    pub async fn write_hls_segment(&self, pkt: &utils::packet::packet::Packet) {
         let (index, duration) = {
             let mut state = self.state.write().await;
             state.duration_sum += pkt.duration();
@@ -95,7 +118,7 @@ impl HlsHandler {
             } else if state.prev_time.elapsed() < tokio::time::Duration::from_millis(500) {
                 return;
             }
-            let duration = state.duration_sum as f32 / pkt.time_base().1 as f32;
+            let duration = state.duration_sum as f32 / pkt.time_base().den as f32;
             // if duration < 1.0 {
             //     return;
             // }
@@ -108,87 +131,45 @@ impl HlsHandler {
             (index, duration)
         };
 
-        let payload = {
-            let mut output = self.output_ctx.lock().await;
-            let Ok(payload) = output.get_payload() else {
-                log::warn!("failed to get payload");
-                return;
-            };
-            payload
-        };
-
-        if let Err(err) = self
-            .target
-            .write_segment(index, HlsPayload { duration, payload })
-            .await
         {
-            log::warn!("failed to write segment: {}", err);
+            let mut cursor: Cursor<Vec<u8>> = Cursor::new(Vec::<u8>::new());
+            let mut fmp4 = self.fmp4.lock().await;
+            if let Err(err) = fmp4.write_end(&mut cursor) {
+                println!("failed to write end: {}", err);
+            }
+
+            let data = cursor.into_inner();
+            if let Err(err) = self
+                .target
+                .write_segment(
+                    index,
+                    HlsPayload {
+                        duration,
+                        payload: bytes::Bytes::from(data),
+                    },
+                )
+                .await
+            {
+                println!("failed to write segment: {}", err);
+            }
         }
     }
-}
-
-fn write_to_temp_file(data: Vec<u8>, file_path: &str) -> anyhow::Result<()> {
-    // 지정된 경로에 파일 생성
-    let path = std::path::Path::new(file_path);
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)?;
-
-    // Vec<u8> 데이터를 파일에 작성
-    file.write_all(&data)?;
-
-    Ok(())
 }
 
 impl SessionHandler for HlsHandler {
     type TrackContext = track_context::TrackContext;
 
     async fn on_initialize(&self) -> anyhow::Result<()> {
-        let config = Mp4Config {
-            major_brand: str::parse("mp42").unwrap(),
-            minor_version: 1,
-            compatible_brands: vec![
-                str::parse("mp41").unwrap(),
-                str::parse("mp42").unwrap(),
-                str::parse("isom").unwrap(),
-                str::parse("hlsf").unwrap(),
-            ],
-            timescale: 1000,
-        };
-
-        let data = Cursor::new(Vec::<u8>::new());
-        let mut writer = mp4::Mp4Writer::write_start(data, &config)?;
-        writer.write_end()?;
-
-        let data: Vec<u8> = writer.into_writer().into_inner();
-        write_to_temp_file(data, "./test.mp4");
-
         {
-            let mut output_ctx = self.output_ctx.lock().await;
-            let mut dict = ffmpeg::Dictionary::new();
-            // dict.set("movflags", "frag_keyframe+empty_moov+default_base_moof");
-            dict.set("movflags", "empty_moov+default_base_moof");
-            dict.set("frag_duration", "100000"); // 1_000_000
-
-            output_ctx.write_header_with(dict)?;
+            let mut fmp4 = self.fmp4.lock().await;
+            let mut cursor = Cursor::new(Vec::<u8>::new());
+            fmp4.write_header(&mut cursor)?;
+            let data = cursor.into_inner();
+            self.target.init_segment(bytes::Bytes::from(data)).await?;
         }
-
-        let payload = {
-            let mut p = self.output_ctx.lock().await;
-            let b = p.get_payload()?;
-            b
-        };
-
-        self.target.init_segment(payload).await?;
-
         Ok(())
     }
     async fn on_finalize(&self) -> anyhow::Result<()> {
-        let mut output_ctx = self.output_ctx.lock().await;
-        output_ctx.write_trailer()?;
-
         Ok(())
     }
     fn get_sources(&self) -> Vec<Arc<HubSource>> {
@@ -211,15 +192,25 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
-        self.write_hls_segment(&pkt).await;
+        {
+            if let Some(data) = pkt.data() {
+                let bytes = bytes::Bytes::copy_from_slice(data);
 
-        if let Err(err) = {
-            let mut output_ctx = self.output_ctx.lock().await;
-            pkt.write_interleaved(&mut output_ctx)
-        } {
-            log::warn!("failed to write packet: {}", err);
-            return;
-        };
+                let mut fmp4 = self.fmp4.lock().await;
+                let mp4Sample = mp4::Mp4Sample {
+                    start_time: unit.pts as u64,
+                    duration: unit.duration as u32,
+                    rendering_offset: 0,
+                    is_sync: false,
+                    bytes,
+                };
+                if let Err(err) = fmp4.write_sample(2, &mp4Sample) {
+                    log::warn!("failed to write sample: {}", err);
+                }
+            }
+        }
+
+        self.write_hls_segment(&pkt).await;
     }
 
     async fn on_audio(&self, ctx: &mut Self::TrackContext, unit: &HubUnit) {
@@ -231,12 +222,21 @@ impl SessionHandler for HlsHandler {
             return;
         };
 
-        let pkt2 = pkt.clone();
-        if let Err(err) = {
-            let mut output_ctx = self.output_ctx.lock().await;
-            pkt.write_interleaved(&mut output_ctx)
-        } {
-            log::warn!("failed to write packet: {}", err);
-        };
+        {
+            if let Some(data) = pkt.data() {
+                let bytes = bytes::Bytes::copy_from_slice(data);
+                let mut fmp4 = self.fmp4.lock().await;
+                let mp4Sample = mp4::Mp4Sample {
+                    start_time: unit.pts as u64,
+                    duration: unit.duration as u32,
+                    rendering_offset: 0,
+                    is_sync: false,
+                    bytes,
+                };
+                if let Err(err) = fmp4.write_sample(1, &mp4Sample) {
+                    log::warn!("failed to write sample: {}", err);
+                }
+            }
+        }
     }
 }

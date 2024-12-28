@@ -9,7 +9,18 @@ WebRTC live streaming allows viewing through both WebRTC and HLS protocols.
 - **WebRTC Viewing**: Provides real-time streaming with latency under 50ms.
 - **HLS Viewing**: Supports Low-Latency HLS with streaming latency of 1-2 seconds.
 
-
+## Structure
+```
+ ingress      hub      egress
+            +-----+
+            |     |
+            |     +--- WebRTC
++-------+   |     |
+| WebRTC|---+ Hub +--- HLS
++-------+   |     |
+            |     |
+            +-----+
+```
 
 ## Supported Codecs
 
@@ -55,3 +66,5 @@ You can run an example demo on the web page.
 ## TODO
 - **Adaptive Bitrate**
 - **AV1 Codec**
+- **File Output**
+- **RTMP Input**

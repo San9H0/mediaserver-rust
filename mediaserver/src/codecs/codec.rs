@@ -1,7 +1,6 @@
 use crate::codecs::h264::codec::H264Codec;
 use crate::codecs::opus::codec::OpusCodec;
 use crate::utils::types::types;
-use ffmpeg_next as ffmpeg;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
@@ -47,13 +46,6 @@ impl Codec {
         }
     }
 
-    pub fn av_codec_id(&self) -> ffmpeg::codec::Id {
-        match self {
-            Codec::Opus(_) => ffmpeg::codec::Id::OPUS,
-            Codec::H264(_) => ffmpeg::codec::Id::H264,
-        }
-    }
-
     pub fn rtp_codec_capability(&self) -> RTCRtpCodecCapability {
         match self {
             Codec::Opus(codec) => codec.rtp_codec_capability(),
@@ -61,30 +53,31 @@ impl Codec {
         }
     }
 
-    pub fn set_av_audio(
-        &self,
-        audio: &mut ffmpeg::codec::encoder::audio::Audio,
-    ) -> anyhow::Result<()> {
+    pub fn sps(&self) -> Option<Vec<u8>> {
         match self {
-            Codec::Opus(_) => {
-                audio.set_rate(48000);
-                audio.set_channel_layout(ffmpeg::channel_layout::ChannelLayout::default(2));
-                audio.set_format(ffmpeg::format::Sample::F32(
-                    ffmpeg::format::sample::Type::Packed,
-                ));
-                Ok(())
-            }
-            Codec::H264(_) => Ok(()),
+            Codec::H264(codec) => codec.sps(),
+            _ => None,
         }
     }
 
-    pub fn set_av_video(
-        &self,
-        video: &mut ffmpeg::codec::encoder::video::Video,
-    ) -> anyhow::Result<()> {
+    pub fn pps(&self) -> Option<Vec<u8>> {
         match self {
-            Codec::Opus(_) => Ok(()),
-            Codec::H264(codec) => codec.set_av_video(video),
+            Codec::H264(codec) => codec.pps(),
+            _ => None,
+        }
+    }
+
+    pub fn width(&self) -> u32 {
+        match self {
+            Codec::H264(codec) => codec.width(),
+            _ => 0,
+        }
+    }
+
+    pub fn height(&self) -> u32 {
+        match self {
+            Codec::H264(codec) => codec.height(),
+            _ => 0,
         }
     }
 }

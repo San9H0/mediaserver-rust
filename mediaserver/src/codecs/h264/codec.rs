@@ -1,6 +1,5 @@
 use crate::codecs::h264::config::Config;
 use crate::utils::types::types;
-use ffmpeg_next as ffmpeg;
 use std::hash::Hash;
 use std::ptr;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
@@ -13,6 +12,22 @@ pub struct H264Codec {
 impl H264Codec {
     pub fn new(config: Config) -> H264Codec {
         H264Codec { config }
+    }
+
+    pub fn sps(&self) -> Option<Vec<u8>> {
+        Some(self.config.sps.payload.clone().to_vec())
+    }
+
+    pub fn pps(&self) -> Option<Vec<u8>> {
+        Some(self.config.pps.payload.clone().to_vec())
+    }
+
+    pub fn width(&self) -> u32 {
+        self.config.sps.width()
+    }
+
+    pub fn height(&self) -> u32 {
+        self.config.sps.height()
     }
 
     pub fn kind(&self) -> types::MediaKind {
@@ -43,26 +58,6 @@ impl H264Codec {
                 .to_string(),
             rtcp_feedback: vec![],
         }
-    }
-
-    pub fn set_av_video(
-        &self,
-        video: &mut ffmpeg::codec::encoder::video::Video,
-    ) -> anyhow::Result<()> {
-        video.set_width(self.config.sps.width());
-        video.set_height(self.config.sps.height());
-        video.set_format(ffmpeg::format::Pixel::YUV420P);
-        video.set_time_base(ffmpeg::Rational::new(1, 30));
-
-        unsafe {
-            let extradata = self.config.extradata();
-            let extradata_ptr = ffmpeg_sys_next::av_malloc(extradata.len()) as *mut u8;
-            ptr::copy_nonoverlapping(extradata.as_ptr(), extradata_ptr, extradata.len());
-            (*video.as_mut_ptr()).extradata = extradata_ptr;
-            (*video.as_mut_ptr()).extradata_size = extradata.len() as i32;
-        }
-
-        Ok(())
     }
 }
 

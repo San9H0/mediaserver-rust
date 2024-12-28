@@ -82,10 +82,19 @@ impl HlsConfig {
     pub fn get_init_video_path(&self) -> String {
         format!("{}/{}/{}", &self.prefix, &self.video_base, INIT_FILE_NAME)
     }
+    pub fn get_init2_video_path(&self) -> String {
+        format!("{}/{}/{}", &self.prefix, &self.video_base, "init2.mp4")
+    }
     pub fn make_part_path(&self, segment_index: i32, part_index: i32) -> std::path::PathBuf {
         std::path::PathBuf::from(format!(
             "{}/{}/{}_{}_{}.m4s",
             self.prefix, &self.video_base, OUTPUT_PREFIX, segment_index, part_index,
+        ))
+    }
+    pub fn make_part2_path(&self, segment_index: i32, part_index: i32) -> std::path::PathBuf {
+        std::path::PathBuf::from(format!(
+            "{}/{}/{}_{}_{}.m4s",
+            self.prefix, &self.video_base, "temp", segment_index, part_index,
         ))
     }
     pub fn make_segment_path(&self, segment_index: i32) -> std::path::PathBuf {

@@ -2,6 +2,5 @@
 members = [
     "mediaserver",
     "bitstreams",
-    "ffmpeg-wrap",
     "m3u8-rs",
 ]
