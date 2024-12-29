@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 bitstreams = { path = "../bitstreams", package = "bitstreams" }
 m3u8-rs = { path = "../m3u8-rs" }
+mp4 = { path = "../mp4-rust"}
 
 actix-web = "4.9.0"
 actix-web-httpauth = "0.8.2"
@@ -34,5 +35,4 @@ libc = "0.2.159"
 runtime = "0.0.0"
 actix-files = "0.6.6"
 flexi_logger = "0.29.6"
-mp4 = { path = "../../mp4-rust"}
 num = "0.4.3"

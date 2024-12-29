@@ -3,4 +3,5 @@ members = [
     "mediaserver",
     "bitstreams",
     "m3u8-rs",
+    "mp4-rust",
 ]
