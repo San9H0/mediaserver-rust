@@ -1,70 +1,54 @@
 # MediaServer-Rust
 
-MediaServer-Rust is a media server project developed in Rust. 
-WebRTC live streaming allows viewing through both WebRTC and HLS protocols.
+MediaServer-Rust is a media server project developed in pure rust.
+
+This project is a pure rust project (no dependencies)
 
 ## Key Features
-
-- **WebRTC Broadcasting**: Start broadcasting using the WebRTC protocol.
-- **WebRTC Viewing**: Provides real-time streaming with latency under 50ms.
+- **WebRTC Ingress**: Easily ingest media streams using WebRTC, enabling low-latency and real-time communication. Implements WHIP as the WebRTC signaling protocol
+- **Multi-Protocol Viewing**:
+- **WebRTC Viewing**: Provides real-time streaming with latency under 50ms. Implements WHEP as the WebRTC signaling protocol
 - **HLS Viewing**: Supports Low-Latency HLS with streaming latency of 1-2 seconds.
 
-## Structure
-```
- ingress      hub      egress
-            +-----+
-            |     |
-            |     +--- WebRTC
-+-------+   |     |
-| WebRTC|---+ Hub +--- HLS
-+-------+   |     |
-            |     |
-            +-----+
-```
-
-## Supported Codecs
-
-- Video: VP8, H.264
+### Supported Codecs
+- Video: H.264
 - Audio: Opus
 
-## Third-Party Tools
-
-- **FFmpeg**: Used as a third-party tool for codec processing and streaming.
+### projects
+- **m3u8-rs**: Forked from the m3u8-rs repository with the added Low-Latency HLS(LLHLS) feature
+- **mp4-rust**: Forked from the mp4-rust repository with the added fragmented MP4 (fmp4) for llhls
+- **bitstreams**: is the crate that bitstream functionalites for H.264
+- **mediaserver**: is the main media server project
+- **web**: A web application designed to test for streaming of media server 
 
 ## Installation and Execution
 
-1. Clone this repository:
-   ```bash
-   https://github.com/San9H0/mediaserver-rust.git
-   cd MediaServer-Rust
-   ```
-
-2. Install dependencies:
-   ```bash
-   cargo build --release
-   ```
-
-3. Run the server:
-   ```bash
-   ./target/release/mediaserver
-   ```
+### Clone this repository:
+```bash
+https://github.com/San9H0/mediaserver-rust.git
+cd mediaServer-rust
+git submodule init
+git submodule update
+cargo run -p mediaserver
+```
 
 ## Usage
-
-### Broadcastring
-- **WebRTC**: Provide live streaming using WebRTC and signal protocol uses WHIP.
-
-### Viewing
-- **WebRTC**: Provides live viewing using WebRTC, where the signaling protocol is WHEP.
-- **HLS**: Provides live viewing using HLS. provides 1~2 seconds of latency using LL-HLS.
-
-
-## Example
-
+### Web
 You can run an example demo on the web page.
+```
+https://github.com/San9H0/mediaserver-rust.git
+cd web
+npm install && npm dev run
+```
+
+## Checklist
+- [x] webrtc ingress
+- [x] webrtc egress
+- [x] ll-hls egress
+- [x] remove ffmpeg dependencies
 
 ## TODO
-- **Adaptive Bitrate**
 - **AV1 Codec**
 - **File Output**
 - **RTMP Input**
+- **Adaptive Bitrate**
