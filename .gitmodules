@@ -1,0 +1,6 @@
+[submodule "m3u8-rs"]
+	path = m3u8-rs
+	url = https://github.com/San9H0/m3u8-rs.git
+[submodule "mp4-rust"]
+	path = mp4-rust
+	url = https://github.com/San9H0/mp4-rust.git
