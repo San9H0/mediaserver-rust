@@ -13,6 +13,10 @@ impl OpusCodec {
         types::MediaKind::Audio
     }
 
+    pub fn codec_string(&self) -> String {
+        "Opus".to_string()
+    }
+
     pub fn mime_type(&self) -> &'static str {
         "audio/opus"
     }

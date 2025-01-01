@@ -26,7 +26,8 @@ pub trait SessionHandler {
         ctx: &mut Self::TrackContext,
         unit: &HubUnit,
     ) -> impl std::future::Future<Output = ()> + Send;
-    async fn read_hub_stream(&self) {}
+
+    fn cancel_token(&self) -> CancellationToken;
 }
 
 pub struct Session<T>
@@ -45,14 +46,14 @@ where
     pub fn new(session_id: &str, handler: T) -> Arc<Self> {
         Arc::new(Session {
             session_id: session_id.to_string(),
-            token: CancellationToken::new(),
+            token: handler.cancel_token(),
             handler: Arc::new(handler),
         })
     }
     pub fn from_arc(session_id: &str, handler: Arc<T>) -> Arc<Self> {
         Arc::new(Session {
             session_id: session_id.to_string(),
-            token: CancellationToken::new(),
+            token: handler.cancel_token(),
             handler,
         })
     }
@@ -67,6 +68,7 @@ where
         for (idx, source) in self.handler.get_sources().iter().enumerate() {
             let codec = source.get_codec().await.unwrap();
             let track = source.get_track(&codec).await?;
+            let source_token = source.token();
             let sink = track.add_sink().await;
             let cancel_token = self.token.clone();
             let self_ = self.clone();
@@ -76,23 +78,26 @@ where
             let handle = tokio::spawn(async move {
                 loop {
                     tokio::select! {
+                        _ = source_token.cancelled() => {
+                            break;
+                        }
                         _ = cancel_token.cancelled() => {
                             break;
                         }
                         result = sink.read_unit() => {
-                             let Ok(unit) = result else {
+                             let Ok(hub_unit) = result else {
                                 log::warn!("read unit failed");
                                 break;
                             };
                             if codec.kind() == types::MediaKind::Audio {
-                                self_.handler.on_audio(&mut ctx, &unit).await;
+                                self_.handler.on_audio(&mut ctx, &hub_unit).await;
                             } else if codec.kind() == types::MediaKind::Video {
-                                self_.handler.on_video(&mut ctx, &unit).await;
+                                self_.handler.on_video(&mut ctx, &hub_unit).await;
                             }
                         }
                     }
                 }
-
+                println!("run session end");
                 track.remove_sink(&sink).await;
             });
             join_handles.push(handle);

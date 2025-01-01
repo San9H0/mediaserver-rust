@@ -1,4 +1,5 @@
 use crate::codecs::codec::Codec;
+use crate::codecs::h264::format::NALUType;
 use crate::egress::services::hls::service::{HlsPayload, HlsService};
 use crate::egress::sessions::hls::track_context;
 use crate::egress::sessions::session::SessionHandler;
@@ -11,6 +12,7 @@ use std::io::{Cursor, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
+use tokio_util::sync::CancellationToken;
 
 struct HlsState {
     index: i32,
@@ -31,6 +33,8 @@ impl HlsState {
 }
 
 pub struct HlsHandler {
+    token: CancellationToken,
+
     started: AtomicBool,
     state: RwLock<HlsState>,
 
@@ -38,10 +42,13 @@ pub struct HlsHandler {
     target: Arc<HlsService>,
 
     fmp4: Mutex<mp4::Fmp4Writer>,
+    duration_ms: u64,
 }
 
 impl HlsHandler {
     pub async fn new(hub_stream: &Arc<HubStream>, target: Arc<HlsService>) -> anyhow::Result<Self> {
+        let duration_ms = (target.config.part_duration * 1000.0) as u64;
+
         let mut width = 0;
         let mut height = 0;
         let mut sps = None;
@@ -65,6 +72,14 @@ impl HlsHandler {
             }
             sources.push(source);
         }
+        println!(
+            "width:{}, height:{}, sps:{:?}, pps:{:?}",
+            width, height, sps, pps
+        );
+        println!(
+            "audio_timescale:{}, video_timescale:{}",
+            audio_timescale, video_timescale
+        );
 
         let fmp4_config = mp4::Mp4Config {
             major_brand: str::parse("iso5").unwrap(),
@@ -97,7 +112,11 @@ impl HlsHandler {
         })
         .unwrap();
 
+        println!("duration_ms:{}", duration_ms);
+
         Ok(HlsHandler {
+            duration_ms,
+            token: CancellationToken::new(),
             state: RwLock::new(HlsState::new()),
             started: AtomicBool::new(false),
             sources,
@@ -115,7 +134,9 @@ impl HlsHandler {
                 state.started = true;
                 state.prev_time = tokio::time::Instant::now();
                 return;
-            } else if state.prev_time.elapsed() < tokio::time::Duration::from_millis(500) {
+            } else if state.prev_time.elapsed()
+                < tokio::time::Duration::from_millis(self.duration_ms)
+            {
                 return;
             }
             let duration = state.duration_sum as f32 / pkt.time_base().den as f32;
@@ -169,6 +190,11 @@ impl SessionHandler for HlsHandler {
         }
         Ok(())
     }
+
+    fn cancel_token(&self) -> CancellationToken {
+        self.token.clone()
+    }
+
     async fn on_finalize(&self) -> anyhow::Result<()> {
         Ok(())
     }
@@ -197,14 +223,14 @@ impl SessionHandler for HlsHandler {
                 let bytes = bytes::Bytes::copy_from_slice(data);
 
                 let mut fmp4 = self.fmp4.lock().await;
-                let mp4Sample = mp4::Mp4Sample {
+                let sample = mp4::Mp4Sample {
                     start_time: unit.pts as u64,
                     duration: unit.duration as u32,
                     rendering_offset: 0,
                     is_sync: false,
                     bytes,
                 };
-                if let Err(err) = fmp4.write_sample(2, &mp4Sample) {
+                if let Err(err) = fmp4.write_sample(2, &sample) {
                     log::warn!("failed to write sample: {}", err);
                 }
             }
@@ -226,14 +252,14 @@ impl SessionHandler for HlsHandler {
             if let Some(data) = pkt.data() {
                 let bytes = bytes::Bytes::copy_from_slice(data);
                 let mut fmp4 = self.fmp4.lock().await;
-                let mp4Sample = mp4::Mp4Sample {
+                let sample = mp4::Mp4Sample {
                     start_time: unit.pts as u64,
                     duration: unit.duration as u32,
                     rendering_offset: 0,
                     is_sync: false,
                     bytes,
                 };
-                if let Err(err) = fmp4.write_sample(1, &mp4Sample) {
+                if let Err(err) = fmp4.write_sample(1, &sample) {
                     log::warn!("failed to write sample: {}", err);
                 }
             }

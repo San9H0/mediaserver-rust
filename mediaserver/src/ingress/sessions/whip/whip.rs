@@ -1,4 +1,5 @@
 use crate::codecs::codec::Codec;
+use crate::codecs::h264::format::NALUType;
 use crate::codecs::rtp_parser::RtpParser;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
@@ -122,13 +123,12 @@ impl WhipSession {
             if candidate.is_none() {
                 return Box::pin(async move {});
             }
-            println!("recv ice candidate...");
             let candidate_tx = candidate_tx.clone();
             Box::pin(async move {
                 if let Err(_) =
                     time::timeout(time::Duration::from_secs(1), candidate_tx.send(())).await
                 {
-                    println!("send end_candidate failed");
+                    log::warn!("send end_candidate failed");
                 }
             })
         })
@@ -243,9 +243,14 @@ impl WhipSession {
             )
             .map_err(|err| log::warn!("unsupported codec: {:?}", err))
             .unwrap();
+            let mut unit_sn: u32 = 0;
+            let mut start_first = true;
+            let mut start_sn = 0;
+            let mut cycle = 0;
+            let mut max_sn = 0;
             let mut start_ts = 0;
             let mut last_ts = 0;
-            let mut duration = 0;
+            let mut duration: u32 = 0;
             let timebase = remote_.codec().capability.clock_rate;
             loop {
                 tokio::select! {
@@ -253,15 +258,27 @@ impl WhipSession {
                         break;
                     }
                     result = remote_.read_rtp() => {
-                        let Ok((rtp_packet, _)) = result else { break };
+                        let Ok((rtp_packet, _)) = result else {
+                            break
+                         };
                         stats_.calc_rtp_stats(&rtp_packet).await;
                         if rtp_packet.payload.len() == 0 {
                             continue;
                         }
-                        if start_ts == 0 {
+                        if start_first {
+                            start_first = false;
                             start_ts = rtp_packet.header.timestamp;
                             last_ts = rtp_packet.header.timestamp;
+
+                            start_sn = rtp_packet.header.sequence_number;
+                            max_sn = start_sn;
+                        } else if rtp_packet.header.sequence_number.wrapping_sub(max_sn) & 0x8000 == 0 {
+                            if rtp_packet.header.sequence_number < max_sn {
+                                cycle += u16::MAX as u64;
+                            }
+                            max_sn = rtp_packet.header.sequence_number;
                         }
+                        let sn = (cycle | (rtp_packet.header.sequence_number as u64)) - start_sn as u64;
                         let pts = rtp_packet.header.timestamp.wrapping_sub(start_ts);
                         let dts = pts;
                         if rtp_packet.header.timestamp != last_ts {
@@ -280,6 +297,7 @@ impl WhipSession {
 
                             source
                             .write_unit(HubUnit {
+                                sn:unit_sn,
                                 payload,
                                 pts,
                                 dts,
@@ -288,6 +306,7 @@ impl WhipSession {
                                 marker,
                                 frame_info,
                             }).await;
+                            unit_sn += 1;
                         }
                     }
                 }
@@ -319,6 +338,11 @@ impl WhipSession {
             )
             .map_err(|err| log::warn!("unsupported codec: {:?}", err))
             .unwrap();
+            let mut unit_sn: u32 = 0;
+            let mut start_first = true;
+            let mut start_sn = 0;
+            let mut cycle = 0;
+            let mut max_sn = 0;
             let mut start_ts = 0;
             let mut last_ts = 0;
             let mut duration = 0;
@@ -334,10 +358,20 @@ impl WhipSession {
                         if rtp_packet.payload.len() == 0 {
                             continue;
                         }
-                        if start_ts == 0 {
+                        if start_first {
+                            start_first = false;
                             start_ts = rtp_packet.header.timestamp;
                             last_ts = rtp_packet.header.timestamp;
+
+                            start_sn = rtp_packet.header.sequence_number;
+                            max_sn = start_sn;
+                        } else if rtp_packet.header.sequence_number.wrapping_sub(max_sn) & 0x8000 == 0 {
+                            if rtp_packet.header.sequence_number < max_sn {
+                                cycle += u16::MAX as u64;
+                            }
+                            max_sn = rtp_packet.header.sequence_number;
                         }
+                        let sn = (cycle | (rtp_packet.header.sequence_number as u64)) - start_sn as u64;
                         let pts = rtp_packet.header.timestamp.wrapping_sub(start_ts);
                         let dts = pts;
                         if rtp_packet.header.timestamp != last_ts {
@@ -356,6 +390,7 @@ impl WhipSession {
 
                             source
                             .write_unit(HubUnit {
+                                sn: unit_sn,
                                 payload,
                                 pts,
                                 dts,
@@ -365,6 +400,7 @@ impl WhipSession {
                                 frame_info,
                             })
                             .await;
+                            unit_sn += 1;
                         }
                     }
                 }

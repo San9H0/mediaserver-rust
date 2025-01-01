@@ -9,7 +9,6 @@ mod webrtc_wrapper;
 
 use crate::hubs::hub::Hub;
 use config::{Config, File, FileFormat};
-use std::io::Write;
 use std::sync::Arc;
 
 #[actix_web::main]
@@ -50,23 +49,15 @@ fn init_log(config: Arc<Config>) {
         _ => log::LevelFilter::Info,
     };
 
-    // let log_file = std::fs::File::create("app.log").unwrap();
-    //
-    // env_logger::Builder::new()
-    //     .filter_level(log_level)
-    //     .format(move |buf, record| {
-    //         writeln!(buf, "{}: {}", record.level(), record.args())
-    //     })
-    //     .target(env_logger::Target::Stdout)
-    //     .write_style(env_logger::WriteStyle::Always)
-    //     .target(env_logger::Target::Pipe(Box::new(log_file)))
-    //     .init();
-
-    flexi_logger::Logger::try_with_str(level)
+    let mut logger_builder = flexi_logger::Logger::try_with_str(&level)
         .unwrap()
-        .log_to_file(flexi_logger::FileSpec::default())
-        .write_mode(flexi_logger::WriteMode::BufferAndFlush)
-        // .duplicate_to_stdout(flexi_logger::Duplicate::All)
-        .start()
-        .unwrap();
+        .write_mode(flexi_logger::WriteMode::BufferAndFlush);
+
+    if config.get("log.stdout").unwrap_or(false) {
+        logger_builder = logger_builder.log_to_stdout();
+    } else if config.get("log.file").unwrap_or(false) {
+        logger_builder = logger_builder.log_to_file(flexi_logger::FileSpec::default());
+    }
+
+    logger_builder.start().unwrap();
 }

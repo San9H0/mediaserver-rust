@@ -1,6 +1,8 @@
 
 [log]
 level = "info"
+stdout = true
+file = false
 
 [general]
 workers = 0 # 0 means number of CPUs

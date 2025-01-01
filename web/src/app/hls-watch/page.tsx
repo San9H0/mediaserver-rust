@@ -6,6 +6,7 @@ export default function HLSWatch() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const streamKeyRef = React.useRef<HTMLInputElement>(null);
   const sessionIdRef = React.useRef<HTMLInputElement>(null);
+  const startButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const handleStart = () => {
     const sessionId = sessionIdRef.current?.value;
@@ -104,28 +105,34 @@ export default function HLSWatch() {
       </h1>
 
       <div className="flex flex-col space-y-4">
-        <div>
-          <input
-            type="text"
-            placeholder="Enter Sesssion ID"
-            ref={sessionIdRef}
-            className="input input-bordered w-full"
-          />
+        <div className="flex-1">
+          <div className="flex flex-row">
+            <input
+              type="text"
+              placeholder="Enter Stream Key"
+              ref={streamKeyRef}
+              className="input input-bordered w-full"
+            />
+            <button className="btn btn-outline btn-error" onClick={handleFetch}>
+              Create Session
+            </button>
+          </div>
+          <div className="flex flex-row">
+            <input
+              type="text"
+              placeholder="Enter SessionID"
+              ref={sessionIdRef}
+              className="input input-bordered w-full"
+            />
+            <button
+              className="btn btn-outline btn-error"
+              ref={startButtonRef}
+              onClick={handleStart}
+            >
+              Start
+            </button>
+          </div>
         </div>
-
-        <div className="flex space-x-4">
-          <button className="btn btn-outline btn-error" onClick={handleStart}>
-            Start!
-          </button>
-        </div>
-      </div>
-      <div>
-        <input type="text" placeholder="Enter Session ID" ref={sessionIdRef} />
-        <button onClick={handleStart}>Start</button>
-      </div>
-      <div>
-        <input type="text" placeholder="Enter Stream Key" ref={streamKeyRef} />
-        <button onClick={handleFetch}>Send Fetch Request</button>
       </div>
       <div>
         <video ref={videoRef} controls className="video-js vjs-default-skin" />

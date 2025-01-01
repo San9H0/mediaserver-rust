@@ -1,7 +1,6 @@
 use crate::codecs::h264::config::Config;
 use crate::utils::types::types;
 use std::hash::Hash;
-use std::ptr;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 
 #[derive(Debug, Clone)]
@@ -12,6 +11,24 @@ pub struct H264Codec {
 impl H264Codec {
     pub fn new(config: Config) -> H264Codec {
         H264Codec { config }
+    }
+
+    pub fn codec_string(&self) -> String {
+        let sps = self.config.sps.payload.clone().to_vec();
+
+        // SPS에서 필요한 값 추출
+        let profile_idc = sps[1];
+        let constraint_flags = sps[2];
+        let level_idc = sps[3];
+
+        // constraint_flags의 상위 6비트를 사용
+        let constraint_bits = (constraint_flags & 0b11111100) >> 2;
+
+        // 문자열 포맷으로 변환
+        format!(
+            "avc1.{:02X}{:02X}{:02X}",
+            profile_idc, constraint_bits, level_idc
+        )
     }
 
     pub fn sps(&self) -> Option<Vec<u8>> {

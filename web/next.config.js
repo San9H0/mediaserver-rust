@@ -6,6 +6,10 @@ module.exports = {
         destination: "http://localhost:9090/v1/whip",
       },
       {
+        source: "/v1/whep",
+        destination: "http://localhost:9090/v1/whep",
+      },
+      {
         source: "/v1/hls",
         destination: "http://localhost:9090/v1/hls",
       },

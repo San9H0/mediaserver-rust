@@ -1,3 +1,4 @@
+use crate::codecs::codec::Codec;
 use crate::codecs::rtp_payloader::RtpPayloader;
 use bytes::Bytes;
 use webrtc::rtp::header::Header;
@@ -11,10 +12,11 @@ pub struct RtpPacketizer {
     timestamp: u32,
     sequence: u16,
     clock_rate: u32,
+    codec: Codec,
 }
 
 impl RtpPacketizer {
-    pub fn new(payloader: RtpPayloader, clock_rate: u32) -> Self {
+    pub fn new(payloader: RtpPayloader, codec: &Codec, clock_rate: u32) -> Self {
         RtpPacketizer {
             mtu: 1200,
             payloader,
@@ -23,10 +25,11 @@ impl RtpPacketizer {
             timestamp: rand::random::<u32>(),
             sequence: rand::random::<u16>(),
             clock_rate,
+            codec: codec.clone(),
         }
     }
 
-    pub fn packetize(&mut self, payload: &Bytes, samples: u32) -> anyhow::Result<Vec<Packet>> {
+    pub fn packetize(&mut self, payload: &Bytes, duration: u32) -> anyhow::Result<Vec<Packet>> {
         let payloads = self.payloader.payload(self.mtu - 12, payload)?;
         if payloads.len() == 0 {
             return Ok(vec![]);
@@ -52,7 +55,7 @@ impl RtpPacketizer {
             self.sequence = self.sequence.wrapping_add(1);
         }
 
-        self.timestamp = self.timestamp.wrapping_add(samples);
+        self.timestamp = self.timestamp.wrapping_add(duration);
 
         Ok(packets)
     }

@@ -3,6 +3,7 @@ use crate::egress::services::hls::service::HlsService;
 use crate::egress::sessions::hls::handler::HlsHandler;
 use crate::egress::sessions::session::Session;
 use crate::hubs::hub::Hub;
+use crate::utils::types::types::MediaKind;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -39,15 +40,33 @@ impl HlsServer {
         let session_id = Uuid::new_v4().to_string();
         log::info!("hls session started: {}", &session_id);
 
-        let config = HlsConfig::new(ConfigParams {
+        let mut width = 0;
+        let mut height = 0;
+        let mut video_codec_string = "".to_string();
+        let mut audio_codec_string = "".to_string();
+        for source in hub_stream.get_sources().await {
+            let Some(codec) = source.get_codec().await else {
+                continue;
+            };
+            if codec.kind() == MediaKind::Video {
+                width = codec.width() as u64;
+                height = codec.height() as u64;
+                video_codec_string = codec.codec_string();
+            } else if codec.kind() == MediaKind::Audio {
+                audio_codec_string = codec.codec_string();
+            }
+        }
+
+        let config: HlsConfig = HlsConfig::new(ConfigParams {
             session_id: session_id.clone(),
             video_base: "video0".to_string(),
-            codecs: "avc1.42C020,Opus".to_string(),
-            width: 1280,
-            height: 720,
-            bandwidth: 1000000,
+            codecs: format!("{},{}", video_codec_string, audio_codec_string),
+            // codecs: "avc1.42C020,Opus".to_string(),
+            width: width,
+            height: height,
+            bandwidth: 1000000, // todo
             framerate: 30.0,
-            part_duration: 0.5,
+            part_duration: 1.0,
             part_max_count: 2,
         });
 
@@ -58,18 +77,21 @@ impl HlsServer {
 
         let sess = Session::new(&session_id, handler);
 
-        self.sessions.write().await.insert(
-            session_id.to_string(),
-            Arc::new(HlsSession {
-                handler: sess.clone(),
-                service: service.clone(),
-                config: config.clone(),
-            }),
-        );
+        {
+            self.sessions.write().await.insert(
+                session_id.to_string(),
+                Arc::new(HlsSession {
+                    handler: sess.clone(),
+                    service: service.clone(),
+                    config: config.clone(),
+                }),
+            );
+        }
 
         let server = self.clone();
         let session_id2 = session_id.clone();
         tokio::spawn(async move {
+            println!("run hls session");
             if let Err(err) = sess.run().await {
                 log::warn!("write file failed: {:?}", err);
             }

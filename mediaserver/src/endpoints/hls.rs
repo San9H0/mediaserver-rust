@@ -1,6 +1,4 @@
-use std::path::{Path, PathBuf};
-
-use crate::{egress::services::hls::config::HlsConfig, endpoints::Container};
+use crate::endpoints::Container;
 use actix_files::NamedFile;
 use actix_web::{http, web, HttpRequest, HttpResponse, Responder};
 use actix_web_httpauth::extractors::bearer::BearerAuth;
@@ -117,24 +115,14 @@ pub async fn handle_get_hls(
     };
 
     if !filename.ends_with(".m3u8") && !filename.ends_with(".mp4") && !filename.ends_with(".m4s") {
-        println!("Bad request");
         return Err(actix_web::error::ErrorBadRequest("Bad request"));
     }
 
     if filename.ends_with(".m3u8") {
         let v = tokio::fs::read_to_string(filepath.to_string()).await?;
-        log::info!("get hls playlist : {}", v);
     } else if filename.ends_with(".mp4") || filename.ends_with(".m4s") {
         let v = tokio::fs::read(filepath.to_string()).await?;
-        log::info!("get hls media : {:?}", v.len());
     }
-    // if is_playlist {
-    //     let v = tokio::fs::read_to_string(filepath.to_string()).await?;
-    //     log::info!("get hls playlist : {}", v);
-    // }
-
-    // NamedFile 생성
-    // let mut named_file = NamedFile::open(filepath)?;
 
     let cache_control = if filename.ends_with(".m3u8") {
         "max-age=1, public"

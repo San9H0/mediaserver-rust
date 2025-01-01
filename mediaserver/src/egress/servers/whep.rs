@@ -28,8 +28,10 @@ impl WhepServer {
             .ok_or(anyhow::anyhow!("stream not found"))?;
 
         let session_id = Uuid::new_v4().to_string();
+
         log::info!("whep session started: {}", &session_id);
-        let whep_handler = WhepHandler::new(&hub_stream, &session_id).await?;
+
+        let whep_handler = WhepHandler::new(&session_id, &hub_stream).await?;
         let answer = whep_handler.init(offer).await?;
         let sess = Session::from_arc(&session_id, whep_handler.clone());
 
@@ -42,6 +44,7 @@ impl WhepServer {
             if let Err(err) = sess.run().await {
                 log::warn!("write file failed: {:?}", err);
             }
+            println!("whep session end");
         });
 
         Ok(answer)

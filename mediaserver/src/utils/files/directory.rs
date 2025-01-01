@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+#[allow(dead_code)]
 pub fn create_directory_if_not_exists(file_path: &str) -> std::io::Result<()> {
     let path = Path::new(file_path);
 

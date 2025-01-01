@@ -1,13 +1,16 @@
 use crate::codecs::codec::Codec;
+use crate::codecs::h264::format::NALUType;
 use crate::egress::sessions::session::SessionHandler;
 use crate::egress::sessions::whep::local_track::LocalTrack;
 use crate::egress::sessions::whep::track_context;
 use crate::hubs::source::HubSource;
 use crate::hubs::stream::HubStream;
 use crate::hubs::unit::HubUnit;
+use crate::utils::packet;
 use crate::utils::types::types;
 use crate::webrtc_wrapper::webrtc_api::WebRtcApi;
 use anyhow::anyhow;
+use bitstreams::h264::nal_unit::NalUnit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -27,6 +30,8 @@ use webrtc::track::track_local::TrackLocalWriter;
 use webrtc::track::track_remote::TrackRemote;
 
 pub struct WhepHandler {
+    id: String,
+
     pc: RTCPeerConnection,
     token: CancellationToken,
     local_track: LocalTrack,
@@ -36,7 +41,7 @@ pub struct WhepHandler {
 }
 
 impl WhepHandler {
-    pub async fn new(hub_stream: &Arc<HubStream>, _: &str) -> anyhow::Result<Arc<Self>> {
+    pub async fn new(id: &str, hub_stream: &Arc<HubStream>) -> anyhow::Result<Arc<Self>> {
         let token = CancellationToken::new();
         let local_track = LocalTrack::new();
         let mut sources = vec![];
@@ -66,6 +71,7 @@ impl WhepHandler {
         let pc = api.new_peer_connection().await;
 
         Ok(Arc::new(Self {
+            id: id.to_string(),
             pc,
             token,
             local_track,
@@ -131,7 +137,6 @@ impl WhepHandler {
 
     fn on_peer_connection_state_change(self: &Arc<Self>) -> OnPeerConnectionStateChangeHdlrFn {
         let weak = Arc::downgrade(self);
-        let token = self.token.clone();
         Box::new(move |state: RTCPeerConnectionState| {
             let Some(arc) = weak.upgrade() else {
                 return Box::pin(async move {});
@@ -142,7 +147,6 @@ impl WhepHandler {
                 RTCPeerConnectionState::Disconnected
                 | RTCPeerConnectionState::Failed
                 | RTCPeerConnectionState::Closed => {
-                    token.cancel();
                     arc.token.cancel();
                 }
                 _ => {}
@@ -162,6 +166,10 @@ impl WhepHandler {
 
 impl SessionHandler for WhepHandler {
     type TrackContext = track_context::TrackContext;
+
+    fn cancel_token(&self) -> CancellationToken {
+        self.token.clone()
+    }
 
     fn get_sources(&self) -> Vec<Arc<HubSource>> {
         self.sources.clone()

@@ -11,8 +11,8 @@ pub struct TrackContext {
 
 impl TrackContext {
     pub fn new(codec: &Codec) -> Self {
-        let payloader = RtpPayloader::new(codec.mime_type()).unwrap();
-        let rtp_packetizer = RtpPacketizer::new(payloader, codec.clock_rate());
+        let payloader = RtpPayloader::new(codec, codec.mime_type()).unwrap();
+        let rtp_packetizer = RtpPacketizer::new(payloader, codec, codec.clock_rate());
 
         TrackContext {
             codec: codec.clone(),

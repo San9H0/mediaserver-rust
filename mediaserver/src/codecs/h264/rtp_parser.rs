@@ -57,6 +57,7 @@ impl H264RtpParser {
             .filter(|payload| {
                 let nalu_type = NALUType::from_byte(payload[0]);
                 if nalu_type == NALUType::IDR {
+                    log::info!("keyframe idr");
                     flag = 1;
                 } else if nalu_type == NALUType::SPS {
                     flag = 1;

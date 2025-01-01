@@ -12,20 +12,6 @@ impl Rational {
     }
 }
 
-pub fn rescale(value: i64, src: Rational, dst: Rational) -> Option<i64> {
-    let numerator = value
-        .checked_mul(src.num as i64)?
-        .checked_mul(dst.den as i64)?;
-    let denominator = (src.den as i64).checked_mul(dst.num as i64)?;
-
-    // 분모이 0이 아닌지 확인
-    if denominator == 0 {
-        return None;
-    }
-
-    Some(numerator / denominator)
-}
-
 pub fn rescale_with_rounding(value: i64, src: &Rational, dst: &Rational) -> Option<i64> {
     if src.den == 0 || dst.den == 0 {
         return None;

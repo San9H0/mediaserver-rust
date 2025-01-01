@@ -90,7 +90,7 @@ export default function WebRTCBroadcast() {
     <div className="container ">
       <input type="file" ref={fileInputRef} hidden />{" "}
       <h1 className="text-4xl font-bold text-center text-primary">
-        WebRTC Publisher
+        WebRTC Broadcast
       </h1>
       {/* space-y-4 */}
       <div className="flex flex-col">

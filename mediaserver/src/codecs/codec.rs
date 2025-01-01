@@ -53,6 +53,14 @@ impl Codec {
         }
     }
 
+    pub fn codec_string(&self) -> String {
+        match self {
+            Codec::H264(codec) => codec.codec_string(),
+            Codec::Opus(codec) => codec.codec_string(),
+            _ => "".to_string(),
+        }
+    }
+
     pub fn sps(&self) -> Option<Vec<u8>> {
         match self {
             Codec::H264(codec) => codec.sps(),

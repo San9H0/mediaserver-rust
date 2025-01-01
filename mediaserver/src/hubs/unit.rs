@@ -1,6 +1,7 @@
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HubUnit {
     pub payload: bytes::Bytes,
+    pub sn: u32,
     pub pts: u32,
     pub dts: u32,
     pub duration: u32,

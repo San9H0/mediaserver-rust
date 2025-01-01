@@ -13,22 +13,42 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <nav>
               <ul className="flex space-x-4">
                 <li>
-                  <Link href="/" className="hover:underline">
+                  <Link
+                    href="/"
+                    className="hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Home
                   </Link>
                 </li>
                 <li>
-                  <Link href="/webrtc-broadcast" className="hover:underline">
+                  <Link
+                    href="/webrtc-broadcast"
+                    className="hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     WebRTC 방송
                   </Link>
                 </li>
                 <li>
-                  <Link href="/webrtc-watch" className="hover:underline">
+                  <Link
+                    href="/webrtc-watch"
+                    className="hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     WebRTC 시청
                   </Link>
                 </li>
                 <li>
-                  <Link href="/hls-watch" className="hover:underline">
+                  <Link
+                    href="/hls-watch"
+                    className="hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     HLS 시청
                   </Link>
                 </li>

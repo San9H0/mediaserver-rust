@@ -1,6 +1,8 @@
 use crate::hubs::hub::Hub;
 use crate::{egress, ingress};
-use actix_web::middleware::Logger;
+use actix_web::dev::{ServiceRequest, ServiceResponse};
+use actix_web::middleware::{from_fn, Logger};
+use actix_web::Error;
 use actix_web::{web, App, HttpRequest, HttpServer};
 use std::sync::Arc;
 
@@ -17,6 +19,7 @@ pub async fn build(hub: Arc<Hub>) -> std::io::Result<()> {
                 whep_server: egress::servers::whep::WhepServer::new(hub.clone()),
                 hls_server: egress::servers::hls::HlsServer::new(hub.clone()),
             }))
+            .wrap(from_fn(my_middleware))
             .wrap(Logger::default())
             .configure(routes)
     })
@@ -48,4 +51,25 @@ pub struct Container {
     pub whip_server: Arc<ingress::servers::whip::WhipServer>,
     pub whep_server: Arc<egress::servers::whep::WhepServer>,
     pub hls_server: Arc<egress::servers::hls::HlsServer>,
+}
+
+async fn my_middleware(
+    req: ServiceRequest,
+    next: actix_web::middleware::Next<impl actix_web::body::MessageBody>,
+) -> Result<ServiceResponse<impl actix_web::body::MessageBody>, Error> {
+    let method = req.method().clone();
+    let path = req.path().to_owned();
+    log::info!("incoming request method:{:?}, path:{:?}", method, path);
+    let resp = next.call(req).await;
+    if let Ok(ref resp) = resp {
+        log::info!(
+            "response method:{:?}, path:{:?}, status:{:?}",
+            method,
+            path,
+            resp.status()
+        );
+    } else {
+        log::error!("resp error");
+    }
+    return resp;
 }

@@ -44,7 +44,7 @@ impl TrackContext {
             self.dts = unit.dts - self.base_ts;
         }
 
-        let Some(mut pkt) = self.bfs.make_packet2(&unit) else {
+        let Some(mut pkt) = self.bfs.make_packet(&unit) else {
             return None;
         };
 
